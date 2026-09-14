@@ -1,5 +1,7 @@
 \textit{Bearbeitet von Lars Hellriegel}\\
 
+In diesem Kapitel wird die Implementierung der Firmware für die Positions- und Drehmomentregelung des Greifers beschrieben. Ausgehend von einem Überblick über die Task-Struktur und die beteiligten Kommunikationsschnittstellen werden die Konfiguration der Mikrocontroller-Peripherie, die Ansteuerung des Schrittmotors sowie die Einbindung der in Kapitel \ref{Kap:Regler} hergeleiteten Regler in den zyklischen Regeltask dargestellt. Abschließend wird die softwareseitige Überlast- und Kollisionserkennung erläutert.
+
 
 % +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 % Überblick
@@ -9,7 +11,7 @@ Die Firmware ist auf Basis von FreeRTOS auf dem Nucleo-F767ZI (STM32F767ZI) impl
 
 \begin{figure} [h]
     \centering
-    \includegraphics[width=0.8\linewidth]{Abbildung/Programmablauf.png}
+    \includegraphics[width=0.85\linewidth]{Abbildung/Programmablauf.png}
     \caption{Grober Programmablauf}
     \label{fig:Programmablauf}
 \end{figure}
