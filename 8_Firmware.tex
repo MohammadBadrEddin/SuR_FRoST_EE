@@ -92,7 +92,7 @@ Auf dieser Transportschicht setzen mehrere Konfigurations- und Steuerfunktionen 
     \item \texttt{TMC2209\_Init()} aktiviert per \texttt{GCONF}-Register die UART-Steuerung (\texttt{pdn\_disable}, \texttt{mstep\_reg\_select}), löscht latente Fehlerflags (\texttt{GSTAT}), aktiviert den Chopper (\texttt{CHOPCONF}, \texttt{TOFF=3}) und liest \texttt{GCONF} zur Verifikation zurück. Schlägt der Chip nicht an, meldet die Funktion \texttt{false}.
     \item \texttt{TMC2209\_SetCurrent()} setzt Lauf- und Haltestrom über das \texttt{IHOLD\_IRUN}-Register (je 0–31, entspricht 1/32 bis 32/32 des Skalenendwerts).
     \item \texttt{TMC2209\_SetMicrosteps()} setzt die Mikroschrittauflösung über das \texttt{MRES}-Feld in \texttt{CHOPCONF} (256 bis 1 Mikroschritte je Vollschritt).
-    \item \texttt{TMC2209\_SetStallguardThreshold()} und \texttt{TMC2209\_SetCoolStepThreshold()} konfigurieren StallGuard4 (\texttt{SGTHRS}) bzw. dessen Gültigkeitsfenster (\texttt{TCOOLTHRS}). Beide Werte bilden die Grundlage für die im \texttt{ControlTask} realisierte StallGuard-basierte Kraftregelung.
+    \item \texttt{TMC2209\_SetStallguardThreshold()} und -\texttt{CoolStepThreshold()} konfigurieren StallGuard4 (\texttt{SGTHRS}) bzw. dessen Gültigkeitsfenster (\texttt{TCOOLTHRS}). Beide Werte bilden die Grundlage für die im \texttt{ControlTask} realisierte StallGuard-basierte Kraftregelung.
     \item \texttt{TMC2209\_MoveVelocity()} schreibt eine Solldrehzahl in das \texttt{VACTUAL}-Register (24 Bit, vorzeichenbehaftet). In diesem Betriebsmodus erzeugt der TMC2209 die Mikroschritt-Pulse \emph{intern}; der Mikrocontroller muss keine STEP-Flanken mehr ausgeben. \texttt{TMC2209\_Stop()} setzt \texttt{VACTUAL} auf 0.
 \end{itemize}
 
