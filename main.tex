@@ -1,0 +1,301 @@
+\documentclass[12pt,a4paper,oneside]{report}
+% =========================================================
+% Language
+% =========================================================
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+% =========================================================
+% Stildefinitionen für Blockschaltbilder
+% =========================================================
+\usepackage{newtxtext,newtxmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, fit, backgrounds}
+\tikzset{
+  blk/.style={
+    draw, rounded corners=1.5pt, thick,
+    minimum height=10mm, text width=16mm,
+    align=center, font=\scriptsize,
+    fill=black!3
+  },
+  blkw/.style={blk, text width=28mm},
+  msg/.style={blk, text width=40mm, fill=black!8},
+  sum/.style={
+    draw, circle, thick, minimum size=6mm,
+    inner sep=0pt, font=\small
+  },
+  ghost/.style={
+    draw, circle, thick, dashed, minimum size=6mm,
+    inner sep=0pt, font=\small, text=black!55
+  },
+  sig/.style={-{Latex[length=2mm,width=1.6mm]}, thick},
+  line/.style={thick},
+  miss/.style={-{Latex[length=2mm,width=1.6mm]}, thick, dashed, black!55},
+  lbl/.style={font=\scriptsize},
+  grp/.style={font=\scriptsize, text=black!55}
+}
+ 
+% =========================================================
+% Page Layout
+% =========================================================
+\usepackage[a4paper,
+left=3.5cm,
+right=2.5cm,
+top=3cm,
+bottom=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0pt}
+\setlength{\parindent}{0pt}
+\usepackage{tcolorbox}
+\tcbset{
+  colback=gray!10,
+  colframe=black,
+  boxrule=0.5pt,
+  arc=3pt
+}
+% =========================================================
+% Header and Footer 
+% =========================================================
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\chaptermark}[1]{\markboth{\thechapter\ #1}{}}
+% Kapitelname + Nummer im Header links
+\fancyhead[L]{\nouppercase{\leftmark}}
+% Seitenzahl im Footer (zentriert)
+\fancyfoot[C]{\thepage}
+% Linien
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+% Kapitelanfangsseiten auch mit Header!
+\usepackage{etoolbox}
+\patchcmd{\chapter}{\thispagestyle{plain}}{\thispagestyle{fancy}}{}{}
+% =========================================================
+% Math, Tables, Code
+% =========================================================
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{siunitx}
+\sisetup{locale=DE}
+% =========================================================
+% Figures
+% =========================================================
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\captionsetup{
+font=small,
+labelfont=bf
+}
+% =========================================================
+% Hyperlinks
+% =========================================================
+\PassOptionsToPackage{hyphens}{url} % Erzwingt Umbrüche bei Bindestrichen
+\usepackage{hyperref}
+\hypersetup{
+colorlinks=true,
+linkcolor=black,
+urlcolor=blue,
+citecolor=black
+}
+\usepackage{cleveref}
+\usepackage{hyperref}
+\usepackage{url}
+% =========================================================
+% Code Style (angepasst auf C / Embedded)
+% =========================================================
+\definecolor{codeblue}{rgb}{0.1,0.1,0.7}
+\definecolor{codegreen}{rgb}{0,0.5,0}
+\definecolor{codegray}{rgb}{0.4,0.4,0.4}
+\lstset{
+language=C,
+basicstyle=\ttfamily\footnotesize,
+keywordstyle=\color{codeblue}\bfseries,
+commentstyle=\color{codegray}\itshape,
+stringstyle=\color{codegreen},
+numbers=left,
+numberstyle=\tiny,
+frame=single,
+breaklines=true,
+breakatwhitespace=true,
+tabsize=2,
+showstringspaces=false
+}
+% =========================================================
+% Chapter Style
+% =========================================================
+\usepackage{titlesec}
+\titleformat{\chapter}
+{\normalfont\huge\bfseries}
+{\thechapter.}{1em}{}
+% =========================================================
+% Other Packages
+% =========================================================
+\usepackage{ragged2e}
+\usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+\usepackage{svg}
+\usepackage{csquotes}
+\usepackage[printonlyused]{acronym}
+% =========================================================
+\begin{document}
+\justifying
+\titlespacing*{\chapter}{0pt}{0pt}{20pt}
+% =========================================================
+% Title Page
+% =========================================================
+\begin{titlepage}
+\centering
+\vspace*{1cm}
+\includegraphics[width=0.5\textwidth]{Abbildung/Frankfurt_University_of_Applied_Sciences_logo.png}\\[1.5cm]
+{\Large \textbf{Projektarbeit}}\\[1cm]
+{\huge \textbf{Entwicklung einer Positions- und}}\\[0.5cm]
+{\huge \textbf{Drehmomentregelung für einen Greifer}}\\[0.5cm]
+{\Large \textbf{(FRoST-Endeffektor)}}\\[2cm]
+\textbf{Studiengang:} Mechatronik und Robotik M.Sc.\\
+\textbf{Modul:} Simulation und Regelung\\[0.5cm]
+\textbf{Dozent:} Prof.~Dr.~K.~Schmidt\\[1.5cm]
+\textbf{Vorgelegt am:} \textit{14.09.2026}\\
+im Sommersemester 2026\\[1cm]
+\textbf{Bearbeitet von:}\\[1cm]
+\begin{tabular}{c c}
+\bottomrule \textbf{Name} & \textbf{Matrikelnummer} \\
+\midrule
+\textit{Masoud Fahim}           &   \textit{1208212} \\
+\textit{Mohammad Badr Eddin}    &   \textit{1310838} \\
+\textit{Lars Hellriegel}        &   \textit{1359307} \\
+\textit{Mohamad Shaikh Khalil}  &   \textit{1654017} \\
+\bottomrule
+\end{tabular}
+\vfill
+\end{titlepage}
+
+% =========================================================
+% Eidesstattliche Erklärung
+% =========================================================
+\input{0_Eides_Erklaerung}
+
+% =========================================================
+% Verzeichnisse
+% =========================================================
+\pagenumbering{Roman}
+\tableofcontents
+\newpage
+% =========================================================
+%\chapter*{Abkürzungsverzeichnis}
+
+\listoffigures
+\addcontentsline{toc}{chapter}{Abbildungsverzeichnis}
+\newpage
+%\listoftables
+%\addcontentsline{toc}{chapter}{Tabellenverzeichnis}
+%\newpage
+
+
+% =========================================================
+% Main Part
+% =========================================================
+\cleardoublepage
+\pagenumbering{arabic}
+
+% ---------------------------------------------------------
+% Einleitung
+% ---------------------------------------------------------
+\chapter{Einleitung}
+\input{1_Einleitung}
+\bigskip
+
+% ---------------------------------------------------------
+% Aufgabenstellung & Anforderungen
+% ---------------------------------------------------------
+\chapter{Aufgabenstellung und Anforderungen}\label{Kap:Aufgabe}
+\input{2_Aufgabenstellung}
+\bigskip
+
+% ---------------------------------------------------------
+% Verwendete Hard- & Software
+% ---------------------------------------------------------
+\chapter{Verwendete Hard- und Software}\label{Kap:Material}
+\input{3_Material}
+\bigskip
+
+% ---------------------------------------------------------
+% Entwicklung eines Prüfstands
+% ---------------------------------------------------------
+\chapter{Entwurf und Charakterisierung des Systems}\label{Kap:System}
+\input{4_System}
+% \chapter{Systemcharakterisierung}\label{Charakterisierung}
+% \section{Mechanik und Motorkennlinien}
+% % Analyse von Übersetzung, Reibung, Spiel sowie Motor-/Treiberkennlinien.
+% \textit{[Analyse der Mechanik und der Motor-/Treiberkennlinien]}
+% \section{Systemgrenzen}
+% % Ermittlung von max. Strom, Drehmoment, Geschwindigkeit.
+% \textit{[Ermittelte Systemgrenzen: max. Strom, Drehmoment, Geschwindigkeit]}
+% \section{Mathematisches Modell}
+% % Vereinfachtes mathematisches Modell als Grundlage für den Reglerentwurf.
+% \textit{[Herleitung des vereinfachten mathematischen Modells]}
+\bigskip
+
+% ---------------------------------------------------------
+% Erfassung des Motorfeedbacks
+% ---------------------------------------------------------
+\chapter{Erfassung des Motorfeedbacks}\label{Kap:Feedback}
+\input{5_MotorFeedback}
+\bigskip
+
+
+% ---------------------------------------------------------
+% Reglerentwurf
+% ---------------------------------------------------------
+\chapter{Reglerentwurf}\label{Kap:Regler}
+\input{6_Reglerentwurf}
+\bigskip
+
+
+% ---------------------------------------------------------
+% Simulation
+% ---------------------------------------------------------
+\chapter{Simulation}\label{Kap:Simulation}
+\input{7_Simulation}
+\bigskip
+
+
+% ---------------------------------------------------------
+% Implementierung der Firmware
+% ---------------------------------------------------------
+\chapter{Implementierung der Firmware}\label{Kap:Firmware}
+\input{8_Firmware}
+\bigskip
+
+% ---------------------------------------------------------
+% Testlauf & Resultate
+% ---------------------------------------------------------
+\chapter{Testlauf und Resultate}\label{Kap:Testlauf}
+\input{9_Testlauf}
+\bigskip
+
+% ---------------------------------------------------------
+% Fazit & Ausblick
+% ---------------------------------------------------------
+\chapter{Fazit und Ausblick}\label{Kap:Fazit}
+\input{10_Fazit}
+
+
+% =========================================================
+% Literatur
+% =========================================================
+\cleardoublepage
+\input{11_Literatur}
+
+% =========================================================
+%Anhang
+% =========================================================
+%\appendix
+\chapter{Anhang}
+
+
+\end{document}

@@ -1,0 +1,50 @@
+\textit{Bearbeitet von Mohamad Shaikh Khalil}
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Systemgrenzen
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Ermittlung von Systemgrenzen / Einzuhaltende Systemgrenzen / Voraussichtliche Systemgrenzen}
+
+\textit{z.B. max. Strom, Drehmoment, Geschwindigkeit, usw.}
+
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Mathematisches Modell
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Erstellung eines simplen mathematischen Modells}
+
+\textit{Grundlage für den Reglerentwurf}
+
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Prüfstand
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Entwickelter Prüfstand}
+
+\textit{Beschreibung und CAD-Darstellung von Prüfstand}
+
+
+[Kurzer Satz zur entwickelten UI]
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Schaltplan
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Entwickelter Schaltplan}
+\textit{Bearbeitet von Lars Hellriegel}\\
+
+Abbildung~\ref{fig:Schaltplan} zeigt den Schaltplan des Prüfstands. Kernstück ist das \textit{Nucleo-F767ZI}-Board (STM32F767ZI), das über USB (ST-Link) mit einem Computer verbunden ist und sowohl die Regelung als auch die Kommunikation mit den Peripheriekomponenten übernimmt.
+
+Die Positionserfassung erfolgt über einen \textit{AS5600}-Magnetfeld-Winkelsensor, der per I\textsuperscript{2}C (SCL/SDA) an die Pins PB8/PB9 des Nucleo-Boards angebunden ist. Die I\textsuperscript{2}C-Leitungen sind über zwei $4{,}7\,\mathrm{k\Omega}$-Widerstände nach 3,3\,V gegen Masse gepullt. Versorgt wird der Sensor mit 3,3\,V aus dem Nucleo-Board.
+
+Die Ansteuerung des Schrittmotors erfolgt über einen \textit{TMC2209-v2.0}-Motortreiber. Dieser wird über die Steuersignale \texttt{STEP} (PE9), \texttt{DIR} (PE11) und \texttt{EN} (PE13) mit dem Microcontroller verbunden. Über PD5 ist zusätzlich eine UART-Diagnoseschnittstelle (\texttt{PDN\_UART}) realisiert, deren Leitung mit einem $1\,\mathrm{k\Omega}$-Widerstand als Pull-up/Strombegrenzung beschaltet ist. Die Leistungsversorgung des Treibers (\texttt{VM}) erfolgt über eine externe 12\,V-Quelle, die mit einem $1000\,\mathrm{\mu F}$-Kondensator gepuffert ist. Am Ausgang des Treibers (\texttt{M1A/M1B}, \texttt{M2A/M2B}) ist ein bipolarer Schrittmotor vom Typ \textit{NEMA17} mit seinen beiden Wicklungen (A+/A-, B+/B-) angeschlossen.
+
+Die digitale Logik (Microcontroller, AS5600, Treiberlogik) wird mit 3,3\,V versorgt, während die Motorleistung über den separaten 12\,V-Kreis bereitgestellt wird. Die Masse (GND) ist für alle Teilsysteme gemeinsam geführt.
+
+\begin{figure} [h]
+    \centering
+    \includegraphics[width=1\linewidth]{Abbildung/SimReg_Schaltplan.png}
+    \caption{Schaltplan des Prüfstands}
+    \label{fig:Schaltplan}
+\end{figure}
+
+

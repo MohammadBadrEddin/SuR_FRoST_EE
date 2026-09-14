@@ -1,0 +1,21 @@
+% Präzise Wiedergabe der Aufgabenstellung (Thema 6) und der geforderten
+% Systemanforderungen (Echtzeitfähigkeit, Positioniergenauigkeit,
+% Regelbarkeit von Greifkraft/Drehmoment, Überlast-/Kollisionsschutz,
+% nahtlose Umschaltung, Wiederholgenauigkeit).
+Die Bearbeitung der Projektarbeit lässt sich in die vier folgenden Teilaufgaben aufgliedern:\\
+Die \textit{Charakterisierung des Systems} \textbf{(1)} sollte ursprünglich die Analyse der vorliegenden Mechanik (Übersetzung, Reibung, Spiel) sowie der Motor- und Treiberkennlinien beinhalten. Da kein physischer Greifer vorhanden ist, an dem die Analyse durchgeführt werden kann, ist eine solche Analyse nicht durchführbar. Stattdessen soll im Rahmen dieser Teilaufgabe ein Prüfstand entwickelt werden, der die für die Systemcharakterisierung notwendigen Messungen am Motor-/Treibersystem ermöglicht. Der Prüfstand bildet demnach die messtechnische Grundlage für die Ermittlung der Systemgrenzen (max. Strom, Drehmoment, Geschwindigkeit) auf Basis der am Prüfstand erfassten Motor- und Treiberkennlinien und die Erstellung eines vereinfachten mathematischen Modells als Grundlage für den nachfolgenden Reglerentwurf. \textcolor{red}{Korrekt????}\\
+Das \textit{Auslesen des Motorfeedbacks} \textbf{(2)} umfasst die Rückführung der Regelgrößen mittels geeigneter Sensorik - anstelle der eingangs vorgeschlagenen Strommessung ist ein Encoder zu nutzen - deren aufgenommene Rohdaten aufzubereiten (Filterung, Skalierung) sind.\\
+Die \textit{Entwicklung von zwei Reglern} \textbf{(3)} gibt vor, dass einerseits ein Positionsregler zur exakten Ansteuerung von Fingerstellung bzw. Öffnungsweite und andererseits ein Drehmomentregler zur indirekten oder direkten Regelung der Greifkraft über Motorstrom bzw. -drehmoment zu entwerfen ist. Die Reglerauslegung ist als PI-, PID-, oder Zustandsregelung vor der praktischen Umsetzung zu simulieren und zu parametrieren.\\
+Die \textit{Umsetzung der Regler in FreeRTOS auf einem STM32H7} \textbf{(4)} konnte aufgrund eines Hardwarefehlers des H7 Boards nicht erfolgen, weshalb die Implementierung der Regler als Echtzeitanwendung auf einem STM32F7 vorzunehmen ist.\\
+
+Des Weiteren wurden für das zu entwickelnde Regelungssystem folgende Anforderungen formuliert:
+
+\begin{itemize}
+    \item \textbf{Echtzeitfähigkeit:} Die Regelung muss mit einer definierten, deterministischen Zykluszeit (z.B. \ensuremath{\le} 1 ms) auf der Zielhardware lauffähig sein.
+    \item \textbf{Positioniergenauigkeit:} Die Fingerposition muss mit einer Genauigkeit von \ensuremath{\le} ±0,5 mm (bzw. entsprechender Winkelauflösung) angefahren werden können.
+    \item \textbf{Regelbare Greifkraft/Drehmoment:} Das aufgebrachte Drehmoment bzw. die Greifkraft muss in einem definierten Bereich stufenlos vorgebbar und eingeregelt werden können, um unterschiedlich empfindliche Objekte sicher greifen zu können.
+    \item \textbf{Überlast- und Kollisionsschutz:} Es ist eine Strom-/Drehmomentbegrenzung sowie eine Fehlererkennung (z.B. Blockade, Übertemperatur, Schrittverlust) mit definierter Sicherheitsreaktion vorzusehen.
+    \item \textbf{Nahtlose Umschaltung:} Während des Betriebs muss zwischen Positions- und Drehmomentregelung umgeschaltet werden können (z.B. positionsgeregelte Annäherung, drehmomentgeregelter Greifvorgang).
+    \item \textbf{Wiederholgenauigkeit:} Das Systemverhalten muss über mehrere Greifzyklen hinweg reproduzierbar sein. Hierfür wird ein Langzeittest empfohlen.
+    \item \textbf{Dokumentation:} Systemcharakterisierung, Reglerentwurf, Parametrierung und Testergebnisse sind vollständig zu dokumentieren. Ein experimenteller Vergleich beider Reglerkonzepte am realen System war aufgrund des fehlenden Greifers nicht möglich und ist entsprechend nicht Bestandteil dieser Dokumentation.
+\end{itemize}

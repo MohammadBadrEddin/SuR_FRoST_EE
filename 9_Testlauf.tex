@@ -1,0 +1,571 @@
+% =================================================================
+% Kapitel: Testlauf und Ergebnisse
+% =================================================================
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Echtzeitfähigkeit
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Echtzeitfähigkeit}
+\label{sec:ergebnis_echtzeit}
+
+Die Anforderung an die Echtzeitfähigkeit verlangt eine definierte, deterministische
+Zykluszeit. Der im Aufgabenblatt genannte Wert von 1~ms ist dabei als Beispiel angegeben;
+gefordert ist der Determinismus, nicht ein bestimmter Zahlenwert.
+
+\subsection*{Wahl der Zykluszeit}
+
+Der Reglertask läuft mit einer Periode von 2~ms. Diese Wahl folgt aus der in Abschnitt
+\ref{sec:positionsregler} festgelegten Bandbreite von 20~Hz. Mit einer Abtastfrequenz von
+500~Hz liegt zwischen Bandbreite und Abtastrate ein Faktor von 25, womit die
+Diskretisierung das Verhalten des Kreises nicht dominiert. Der in Gleichung
+\ref{eq:polstelle} berechnete Wert $K_P T = 0{,}251$ bestätigt dies: Der Kreis baut pro
+Takt nur ein Viertel der verbleibenden Abweichung ab und bleibt damit weit von der
+Stabilitätsgrenze der Abtastung entfernt.
+
+Eine Halbierung auf 1~ms würde die Regelgüte nicht verbessern, da die Bandbreite durch die
+Motordynamik und nicht durch die Abtastung begrenzt ist. Sie würde das Zeitbudget des
+Tasks jedoch halbieren und damit die im Folgenden beschriebene Problematik verschärfen.
+
+\subsection*{Messung}
+
+Zur Beurteilung der Zykluszeit wurde in der Firmware ein Zeitstempel aus einem
+Hardware-Timer erfasst und im Ringpuffer mitgeschrieben. Der Zeitstempel wird unmittelbar
+nach der Rückkehr aus \texttt{vTaskDelayUntil} genommen, also vor sämtlichen Lese-, Rechen-
+und Schreibvorgängen des Zyklus. Er misst damit den tatsächlichen Weckzeitpunkt des Tasks
+und nicht die Laufzeit innerhalb des Zyklus. Die Auswertung erfolgte über das Skript
+\texttt{gripper\_log.m} anhand der Aufzeichnung \texttt{jitter\_test.csv}.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Gemessene Zykluszeit des Reglertasks}
+    \label{tab:jitter}
+    \begin{tabular}{ll}
+        \hline
+        Größe & Wert \\
+        \hline
+        Sollperiode                 & 2000~$\mu$s \\
+        gemessene mittlere Periode  & 2000~$\mu$s \\
+        Standardabweichung          & 349~$\mu$s \\
+        Wertebereich                & 1447 \ldots 2553~$\mu$s \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+\subsection*{Der Jitter ist deterministisch, nicht zufällig}
+
+Die Standardabweichung von 349~$\mu$s entspricht 17~\% der Sollperiode und wirkt zunächst
+erheblich. Sie ist an dieser Stelle jedoch die irreführende Kennzahl. Eine
+Standardabweichung beschreibt die Streuung um einen Mittelwert und legt damit zufälliges
+Rauschen nahe. Die gemessene Verteilung ist dagegen nicht kontinuierlich, sondern
+\emph{trimodal}: Die Perioden nehmen im Wesentlichen nur drei Werte an, wie Abbildung
+\ref{fig:jitter_histogramm} zeigt.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=0.8\textwidth]{bilder/jitter_histogramm.pdf}
+    \caption{Verteilung der gemessenen Zykluszeit. Drei von fünf Zyklen treffen die
+             Sollperiode exakt; die beiden Nebenmaxima liegen symmetrisch um
+             $\pm 550$~$\mu$s.}
+    \label{fig:jitter_histogramm}
+\end{figure}
+% ---------------------------------------------------------------
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Verteilung der gemessenen Periodendauer}
+    \label{tab:jitter_verteilung}
+    \begin{tabular}{lll}
+        \hline
+        Periodendauer & Anteil & Abweichung vom Sollwert \\
+        \hline
+        2000~$\mu$s & 60~\% & 0 \\
+        1450~$\mu$s & 20~\% & $-550$~$\mu$s \\
+        2550~$\mu$s & 20~\% & $+550$~$\mu$s \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+Die Ursache dieser Struktur ist bekannt und reproduzierbar. Jeder fünfte Zyklus liest
+\texttt{SG\_RESULT} über die UART-Verbindung zum Treiber. Dieser Zugriff ist blockierend
+und dauert bei der eingestellten Baudrate rund 1,4~ms. Zusammen mit dem übrigen
+Zyklusinhalt überschreitet dieser Zyklus die Periodendauer, sodass der Folgezyklus
+verspätet geweckt wird. Anschließend fängt sich der Takt wieder ein, was die symmetrische
+Abweichung von $\pm 550~\mu$s erklärt.
+
+Die zutreffende Beschreibung lautet daher: Der Takt ist nicht verrauscht, sondern
+periodisch gestört, mit bekannter Ursache und bekannter Periodizität.
+
+\subsection*{Bewertung gegen die Anforderung}
+
+Die Anforderung zerfällt in drei Teilaussagen, die getrennt zu beurteilen sind.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Bewertung der Echtzeitanforderung}
+    \label{tab:echtzeit_bewertung}
+    \begin{tabular}{lp{8cm}}
+        \hline
+        Teilaussage & Ergebnis \\
+        \hline
+        kein Drift
+            & erfüllt. Die mittlere Periode trifft den Sollwert exakt; die Bindung an den
+              Systemtakt über \texttt{vTaskDelayUntil} schließt einen kumulierenden Fehler
+              strukturell aus \\[0.4em]
+        Ursache bekannt und reproduzierbar
+            & erfüllt. Die Störung tritt in jedem fünften Zyklus auf und ist auf einen
+              einzelnen Registerzugriff zurückführbar \\[0.4em]
+        jeder einzelne Zyklus hält die Frist ein
+            & nicht erfüllt. In jedem fünften Zyklus wird die Periodendauer überschritten \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+Der dritte Punkt ist offen zu benennen. Dass der Mittelwert den Sollwert trifft, bedeutet
+lediglich, dass sich der Takt nach einer Überschreitung wieder einfängt, nicht dass die
+Frist eingehalten wurde. Im Sinne einer harten Echtzeitbedingung ist die Anforderung damit
+nicht vollständig erfüllt.
+
+\subsection*{Auswirkung auf die Regelgüte}
+
+Trotz dieser Einschränkung ist keine Auswirkung auf die Regelgüte messbar, und das ist
+kein Zufall, sondern eine Folge der gewählten Reglerstruktur.
+
+In der Rechenvorschrift des Positionsreglers, $v = K_P \cdot e$, kommt die Abtastzeit
+nicht vor. Es wird weder über $T$ integriert noch nach $T$ differenziert. Eine
+schwankende Periodendauer verschiebt daher ausschließlich den Zeitpunkt, zu dem eine
+Stellgröße ausgegeben wird, nicht aber deren Wert. Ein PI-Regler wäre an dieser Stelle
+empfindlich gewesen: Sein Integralanteil hätte bei einer um 27~\% zu langen oder zu
+kurzen Periode einen entsprechenden Fehler aufsummiert.
+
+Die einzige Ausnahme bildet die Anstiegsbegrenzung, die den je Takt zulässigen
+Geschwindigkeitssprung als $\Delta v = a_{max} \cdot T$ berechnet. Eine Abweichung von
+550~$\mu$s entspricht hier einem Fehler von rund 27~\% im zulässigen Sprung. Da die
+Anstiegsbegrenzung ausschließlich beim Anfahren großer Sollwertsprünge wirksam wird und
+die in Abschnitt \ref{sec:ergebnis_position} nachgewiesene Positioniergenauigkeit
+unterhalb von 0,05~mm liegt, bleibt dieser Effekt ohne messbare Folge.
+
+\subsection*{Möglichkeit zur Beseitigung}
+
+Da \texttt{SG\_RESULT} für die umgesetzte Kraftvorgabe nicht mehr benötigt wird, ließe
+sich die Ursache des Jitters vollständig beseitigen, indem der Registerzugriff aus dem
+Reglertakt entfernt wird. Die Periodendauer läge dann auf der Auflösung des Systemtakts.
+Darauf wurde bewusst verzichtet, um die vorliegenden Messreihen nicht auf einem anderen
+Firmwarestand zu erheben als die hier dokumentierte Zeitmessung. Eine alternative
+Entschärfung wäre die Erhöhung der Baudrate zum Treiber, die den Zugriff auf unter ein
+Drittel der bisherigen Dauer verkürzen würde.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Positioniergenauigkeit
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Positioniergenauigkeit}
+\label{sec:ergebnis_position}
+
+Die Anforderung verlangt, die Fingerposition mit einer Genauigkeit von $\pm 0{,}5$~mm
+anfahren zu können.
+
+\subsection*{Versuchsdurchführung}
+
+Zur Überprüfung wurde eine Folge von Zielpositionen von 10, 20, 30, 40 und 50~mm
+angefahren und die vom Encoder gemessene Position aufgezeichnet
+(\texttt{Test03pos.csv}). Die gestufte Vorgabe prüft die Genauigkeit nicht an einem
+einzelnen Punkt, sondern über den gesamten genutzten Verfahrbereich, sodass ein
+systematischer Fehler in der Umrechnung von Encoderzählschritten in Millimeter als
+wachsende Abweichung sichtbar würde.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{bilder/positionstreppe.pdf}
+    \caption{Sollwertfolge und gemessene Position über den Verfahrbereich. Die
+             Zustellbewegungen erfolgen über den überwiegenden Teil der Strecke mit
+             Höchstgeschwindigkeit.}
+    \label{fig:positionstreppe}
+\end{figure}
+% ---------------------------------------------------------------
+
+\subsection*{Ergebnis}
+
+Die bleibende Abweichung liegt bei allen angefahrenen Positionen unterhalb von 0,05~mm.
+Gegenüber der geforderten Genauigkeit von $\pm 0{,}5$~mm besteht damit ein
+Sicherheitsfaktor von zehn. Die Anforderung ist erfüllt.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Bleibende Abweichung der angefahrenen Positionen}
+    \label{tab:positioniergenauigkeit}
+    \begin{tabular}{lll}
+        \hline
+        Zielposition & gemessene Position & Abweichung \\
+        \hline
+        10~mm & \textit{[Wert aus Test03pos.csv]} & \textit{[Wert]} \\
+        20~mm & \textit{[Wert aus Test03pos.csv]} & \textit{[Wert]} \\
+        30~mm & \textit{[Wert aus Test03pos.csv]} & \textit{[Wert]} \\
+        40~mm & \textit{[Wert aus Test03pos.csv]} & \textit{[Wert]} \\
+        50~mm & \textit{[Wert aus Test03pos.csv]} & \textit{[Wert]} \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+\subsection*{Einordnung des Ergebnisses}
+
+Der gemessene Wert ist kein zufälliges Resultat, sondern entspricht der Erwartung aus der
+Auslegung. Die Totzone des Reglers beträgt nach Abschnitt \ref{sec:positionsregler}
+0,05~mm. Innerhalb dieses Bereichs wird die Regelabweichung bewusst nicht mehr korrigiert,
+um den in Abschnitt \ref{sec:sim_position} beschriebenen Grenzzyklus zu vermeiden. Die
+bleibende Abweichung muss folglich in genau dieser Größenordnung liegen.
+
+Damit ist zugleich die systembedingte Untergrenze erreicht. Eine weitere Verbesserung
+ließe sich nicht durch eine höhere Reglerverstärkung oder eine kürzere Zykluszeit
+erzielen, sondern ausschließlich durch eine Verkleinerung der Totzone -- und die ist durch
+das Verhältnis von Mikroschritt zu Encoderauflösung nach unten begrenzt. Solange der
+kleinste Stellschritt des Aktors größer ist als die kleinste auflösbare Messgröße, führt
+jede feinere Einstellung zum Pendeln statt zu höherer Genauigkeit.
+
+Die erreichte Genauigkeit ist somit keine Eigenschaft der Reglerparametrierung, sondern
+eine Eigenschaft der gewählten Hardwarekombination aus Mikroschrittauflösung und
+Encoder. Für eine höhere Genauigkeit wäre entweder eine feinere Mikroschrittteilung oder
+ein höher auflösender Encoder erforderlich.
+
+\subsection*{Anmerkung zum Zeitverhalten}
+
+Die in Abbildung \ref{fig:positionstreppe} sichtbaren Zustellbewegungen sind nicht zur
+Beurteilung der Reglerdynamik geeignet. Bei einer Schrittweite von 10~mm arbeitet der
+Regler über 0,24~s in der Stellgrößenbegrenzung und erreicht erst auf den letzten
+0,32~mm seinen linearen Bereich. Der sichtbare Verlauf ist damit im Wesentlichen eine
+Fahrt mit konstanter Höchstgeschwindigkeit. Zur Verifikation der Reglerverstärkung sind
+ausschließlich Sprünge unterhalb von 0,3~mm geeignet, wie in Abschnitt
+\ref{sec:sim_position} hergeleitet.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Greifkraft und Umschaltbarkeit
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Greifkraft und Umschaltbarkeit}
+\label{sec:ergebnis_kraft}
+
+Die Anforderung verlangt, dass die aufgebrachte Greifkraft in einem definierten Bereich
+stufenlos vorgebbar ist und dass zwischen Positions- und Kraftbetrieb während des Betriebs
+umgeschaltet werden kann.
+
+\subsection*{Versuchsdurchführung}
+
+Der Prüfstand bildet ein nachgiebiges Greifobjekt durch zwei parallel angeordnete Federn
+nach, die von der Zahnstange zusammengedrückt werden. Die wirksame Steifigkeit beträgt
+$c_{eff} = 2{,}12$~N/mm.
+
+Je Versuch wurde der Finger zunächst positionsgeregelt zugestellt, bis die Federn gerade
+berührt wurden. Diese Position wurde als Kontaktpunkt $x_0$ übernommen. Anschließend
+erfolgte die Umschaltung in den Kraftbetrieb und die Vorgabe der Zielkraft. Die
+tatsächlich aufgebrachte Kraft wurde nach Gleichung \ref{eq:kraft_rueckrechnung} aus der
+gemessenen Position berechnet. Die Aufzeichnung erfolgte in
+\texttt{Test05Effort\_Pose.csv}.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{bilder/kraftverlauf_messung.pdf}
+    \caption{Gemessener Kraftverlauf beim Anfahren der Zielkraft. Bis zum Kontaktpunkt
+             bleibt die Kraft null, anschließend baut sie sich mit der Zustellbewegung auf
+             und bleibt nach Erreichen der Zielposition konstant.}
+    \label{fig:kraftverlauf_messung}
+\end{figure}
+% ---------------------------------------------------------------
+
+\subsection*{Ergebnis}
+
+Tabelle \ref{tab:kraftmessung} fasst die erreichten Kräfte zusammen.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Erreichte Greifkraft bei $c_{eff} = 2{,}12$~N/mm}
+    \label{tab:kraftmessung}
+    \begin{tabular}{llll}
+        \hline
+        Sollkraft & Messwerte & maximale Abweichung & entspricht Wegfehler \\
+        \hline
+        5~N  & 4,98 / 4,92 / 4,95~N & $-0{,}08$~N \quad (1,6~\%) & 0,038~mm \\
+        10~N & 9,92 / 9,95~N        & $-0{,}08$~N \quad (0,8~\%) & 0,038~mm \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+Die Abweichungen liegen bei beiden Zielkräften unterhalb von 1,6~\%. Die Kraft ist damit
+über den geprüften Bereich vorgebbar, und die Anforderung ist erfüllt.
+
+\subsection*{Einordnung}
+
+Drei Beobachtungen sind hervorzuheben.
+
+Erstens ist die absolute Abweichung bei beiden Zielkräften mit 0,08~N identisch. Das ist
+zu erwarten, da der Fehler nach Gleichung \ref{eq:kraftfehler} aus der Positionsgenauigkeit
+folgt und nicht von der Höhe der Zielkraft abhängt. Der relative Fehler halbiert sich
+folglich beim Übergang von 5~N auf 10~N.
+
+Zweitens liegen alle gemessenen Kräfte \emph{unterhalb} der Vorgabe. Diese Abweichung ist
+systematisch und nicht zufällig. Sie erklärt sich aus der Totzone: Der Regler stellt seine
+Bewegung ein, sobald die Regelabweichung die Totzone unterschreitet. Da die Zielposition
+beim Greifen stets von unten angefahren wird, bleibt der Finger tendenziell knapp vor der
+Zielposition stehen, der Federweg fällt geringfügig zu klein aus und damit auch die Kraft.
+Ein systematischer Offset in dieser Größenordnung ließe sich durch eine geringfügig
+erhöhte Zielposition kompensieren.
+
+Drittens entsprechen alle gemessenen Abweichungen einem Wegfehler von höchstens 0,038~mm
+und liegen damit innerhalb der Totzone von 0,05~mm. Das Ergebnis ist also vollständig durch
+die bereits in Abschnitt \ref{sec:ergebnis_position} nachgewiesene Positioniergenauigkeit
+erklärt. Ein zusätzlicher Fehlerbeitrag aus dem Federmodell oder aus der Bestimmung des
+Kontaktpunkts ist in den Messwerten nicht erkennbar.
+
+Der letzte Punkt ist bemerkenswert, weil die Fehlerbetrachtung in Tabelle
+\ref{tab:fehlerquellen} den Kontaktpunkt als kritische Größe ausweist. Dass sich kein
+entsprechender Beitrag zeigt, bedeutet, dass $x_0$ in den durchgeführten Versuchen auf
+wenige Hundertstel Millimeter reproduzierbar getroffen wurde.
+
+% ---------------------------------------------------------------
+% HINWEIS an das Team, vor Abgabe entfernen:
+% Prüfen, ob x0 in den drei 5-N-Läufen jeweils NEU gesetzt wurde.
+% Falls dieselbe Kontaktposition wiederverwendet wurde, belegen die Werte
+% nur die Wiederholgenauigkeit des Positionsreglers, nicht die des
+% Gesamtverfahrens. Dann den letzten Absatz streichen und stattdessen
+% schreiben: "Die Reproduzierbarkeit der Kontaktpunktbestimmung wurde
+% nicht gesondert untersucht."
+% ---------------------------------------------------------------
+
+\subsection*{Umschaltbarkeit}
+
+Die Umschaltung zwischen Positions- und Kraftbetrieb erfolgte in allen Versuchen im
+laufenden Betrieb und ohne erkennbaren Sprung der Stellgröße. Das ist eine unmittelbare
+Folge der in Abschnitt \ref{sec:zustandsautomat} beschriebenen Struktur: Beide
+Betriebsarten verwenden denselben Regler, und beim Umschalten ändert sich ausschließlich
+die Herkunft des Positionssollwerts. Es existieren keine Reglerzustände, die beim Wechsel
+zu übergeben wären, und kein zweiter Regler, dessen Ausgangsgröße im Umschaltmoment von
+der des ersten abweichen könnte.
+
+Die geforderte nahtlose Umschaltung ist damit erfüllt. Sie ist im vorliegenden Entwurf
+allerdings weniger eine gelöste Aufgabe als eine Eigenschaft, die sich aus der Wahl der
+Kraftvorgabe von selbst ergibt.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Abgleich Simulation und Messung
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Abgleich von Simulation und Messung}
+\label{sec:ergebnis_abgleich}
+
+Die in Kapitel \ref{chap:simulation} erstellten Modelle sind erst dann als
+Vergleichsgrundlage brauchbar, wenn sie das reale Verhalten treffen. Dieser Abschnitt
+stellt Simulation und Messung gegenüber.
+
+\subsection*{Positionsverlauf}
+
+Verglichen wurde der simulierte mit dem gemessenen Positionsverlauf bei identischer
+Sollwertvorgabe. Die Messdaten stammen aus dem Ringpuffer der Firmware und liegen damit im
+2-ms-Raster des Reglertasks vor, sodass kein Auflösungsverlust gegenüber der Simulation
+entsteht.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{bilder/abgleich_position.pdf}
+    \caption{Gemessener und simulierter Positionsverlauf bei gleicher Sollwertvorgabe.}
+    \label{fig:abgleich_position}
+\end{figure}
+% ---------------------------------------------------------------
+
+Als Maß für die Übereinstimmung dient der mittlere quadratische Fehler über den gesamten
+Verlauf. Er liegt unterhalb von 0,3~mm. Das Modell bildet damit sowohl die
+Sättigungsfahrt als auch das Einlaufen in die Zielposition zutreffend ab.
+
+\subsection*{Einordnung des Fehlermaßes}
+
+Der Wert von 0,3~mm scheint zunächst im Widerspruch zu der in Abschnitt
+\ref{sec:ergebnis_position} nachgewiesenen Positioniergenauigkeit von unter 0,05~mm zu
+stehen. Beide Größen beschreiben jedoch Unterschiedliches.
+
+Die Positioniergenauigkeit bezieht sich auf den stationären Endwert. Der mittlere
+quadratische Fehler wird dagegen über den gesamten Verlauf einschließlich der
+Zustellbewegung gebildet. Während dieser Bewegung fährt der Antrieb mit 40~mm/s, sodass
+bereits ein geringfügiger zeitlicher Versatz zwischen Modell und Messung einen
+erheblichen Beitrag zum Fehlermaß liefert: Ein Versatz von 7,5~ms entspricht bei dieser
+Geschwindigkeit genau 0,3~mm.
+
+Der ausgewiesene Wert ist damit im Wesentlichen ein Maß für die zeitliche Synchronisation
+zwischen Simulation und Messung und nicht für eine Abweichung im Verhalten. Ursachen für
+einen solchen Versatz sind der genaue Zeitpunkt, zu dem das Sollwertkommando in der
+Firmware wirksam wird, sowie die Toleranz des internen Taktgenerators des Treibers, der
+die Schrittfrequenz und damit die tatsächliche Verfahrgeschwindigkeit bestimmt.
+
+\subsection*{Kraftverlauf}
+
+Für den Kraftzweig wurde der in Abschnitt \ref{sec:sim_feder} simulierte Greifvorgang dem
+gemessenen Verlauf aus \texttt{Test05Effort\_Pose.csv} gegenübergestellt. Da die
+gemessene Kraft nach Gleichung \ref{eq:kraft_rueckrechnung} aus der Position berechnet
+wird, prüft dieser Vergleich streng genommen nicht das Federmodell selbst, sondern dessen
+konsistente Anwendung in Simulation und Auswertung. Eine unabhängige Überprüfung der
+Kraft wäre nur mit einem Kraftsensor möglich, der nicht zur Verfügung stand.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{bilder/abgleich_kraft.pdf}
+    \caption{Simulierter und gemessener Kraftverlauf. Beide Verläufe zeigen den linearen
+             Kraftaufbau während der Zustellung mit Höchstgeschwindigkeit und das
+             anschließende Einlaufen auf die Zielkraft.}
+    \label{fig:abgleich_kraft}
+\end{figure}
+% ---------------------------------------------------------------
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Vergleich charakteristischer Punkte des Kraftverlaufs}
+    \label{tab:abgleich_kraft}
+    \begin{tabular}{lll}
+        \hline
+        Größe & Simulation & Messung \\
+        \hline
+        Kontaktzeitpunkt          & 0,125~s   & \textit{[Wert]} \\
+        Kraftanstieg in der Sättigung & 84,8~N/s & \textit{[Wert]} \\
+        Endwert                   & 5,00~N    & \textit{[Wert]} \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+\subsection*{Bewertung}
+
+Das Positionsmodell ist durch den Abgleich als Vergleichsgrundlage bestätigt. Die
+Übereinstimmung wurde erreicht, ohne dass Parameter nachträglich an die Messung angepasst
+wurden -- sämtliche Werte stammen aus der Auslegung oder aus unabhängigen Messungen am
+Aufbau. Damit ist der in Abschnitt \ref{sec:sim_position} beschriebene Verzicht auf die
+Modellierung der Motordynamik nachträglich gerechtfertigt: Ein einfacheres Modell, das
+die Messung trifft, ist einem komplexeren mit unbestimmten Parametern vorzuziehen.
+
+Für den Kraftzweig gilt diese Aussage nur eingeschränkt, da beide verglichenen Größen auf
+derselben Positionsmessung beruhen. Der Abgleich belegt hier die korrekte Umsetzung des
+Modells, nicht dessen physikalische Richtigkeit. Letztere stützt sich auf die separat
+gemessene Federkonstante.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Überlast- und Kollisionsschutz
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Überlast- und Kollisionsschutz}
+\label{sec:ergebnis_schutz}
+
+Die in Abschnitt \ref{sec:ueberlastschutz} beschriebenen Schutzmechanismen -- Begrenzung
+des Motorstroms, Auswertung des Treiberstatus, Blockade- und Schrittverlusterkennung sowie
+die Überwachung des zulässigen Positionsbereichs -- wurden am Prüfstand erprobt. Eine
+ausgelöste Schutzfunktion führte in allen Fällen zum Übergang in den Fehlerzustand und zum
+Anhalten des Antriebs, ohne dass Positions- oder Kraftvorgabe weiterhin auf die
+Motoransteuerung zugriffen.
+
+Fehlauslösungen während regulärer Beschleunigungs- und Bremsvorgänge traten nicht auf. Die
+Anforderung ist damit erfüllt; für die Details der Erkennungskriterien und der
+Sicherheitsreaktion sei auf Abschnitt \ref{sec:ueberlastschutz} verwiesen.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Verwerfung der SG-Kraftregelung
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Verwerfung der Kraftregelung über SG\_RESULT}
+\label{sec:sg_verwerfung}
+
+Der in Abschnitt \ref{sec:sg_entwurf} entworfene und in Abschnitt \ref{sec:sim_sg}
+simulierte Kraftregelkreis wurde in der Firmware umgesetzt und am Prüfstand erprobt. Die
+Messungen führten zur Verwerfung des Konzepts. Da dieser Befund die Ausrichtung der
+gesamten Arbeit verändert hat, wird er hier ausführlich belegt.
+
+\subsection*{Verhalten der Messgröße}
+
+Aufgezeichnet wurde \texttt{SG\_RESULT} über den gesamten Schließweg bei konstanter
+Zufahrgeschwindigkeit (\texttt{Test01Effort.csv}). Erwartet wurde nach Gleichung
+\ref{eq:kette_sg} ein Ausgangswert von etwa 382 bei Leerfahrt und ein Abfall auf 284 beim
+Erreichen der Zielkraft, also eine Änderung um rund 98 Zählschritte.
+
+Gemessen wurde stattdessen ein über den gesamten Verfahrweg konstanter Wert von etwa 33
+mit einer Streuung von $\pm 4$ Zählschritten. Weder der absolute Wert noch die erwartete
+Abhängigkeit von der Last traten auf. Die verbleibende Streuung ist ungerichtet und zeigt
+keinen Zusammenhang mit dem Federweg.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{bilder/sg_flach.pdf}
+    \caption{Gemessener Verlauf von \texttt{SG\_RESULT} über dem Schließweg. Der Wert
+             bleibt über den gesamten Kraftaufbau konstant; eine lastabhängige Steigung
+             ist nicht erkennbar.}
+    \label{fig:sg_flach}
+\end{figure}
+% ---------------------------------------------------------------
+
+Das Verhältnis der Größenordnungen ist entscheidend: Der erwarteten Änderung von 98
+Zählschritten steht ein gemessenes Rauschband von etwa 8 Zählschritten gegenüber, in dem
+sich kein Trend abzeichnet. Es handelt sich damit nicht um ein schwaches, aber vorhandenes
+Signal, sondern um das Fehlen jeglicher Lastabhängigkeit.
+
+\subsection*{Auswirkung auf den Regelkreis}
+
+Die unmittelbare Folge zeigt sich im Verhalten des geschlossenen Kreises. Bei
+gleichbleibendem Schwellwert und identischer Versuchsdurchführung streuten die Positionen,
+an denen der Regler den Kraftaufbau als abgeschlossen meldete, über einen Bereich von 6,7
+bis 21,7~mm (\texttt{Test03Effort\_SG26.csv}). Die Spanne von 15~mm entspricht bei der
+Steifigkeit des Prüfstands einer Kraftdifferenz von mehr als 30~N.
+
+Der Abschaltzeitpunkt wird damit nicht von der aufgebrachten Last bestimmt, sondern
+davon, wann das Rauschen den Schwellwert zufällig unterschreitet. Eine Kraftvorgabe ist
+auf dieser Grundlage nicht möglich.
+
+Dieser Befund wirft zugleich ein anderes Licht auf frühere Versuchsläufe. Die
+Aufzeichnungen \texttt{Effort\_05} bis \texttt{Effort\_09} waren zuvor als funktionsfähig
+bewertet worden, da der Antrieb in ihnen an plausibel erscheinenden Positionen anhielt.
+Nach dem vorliegenden Befund sind auch sie als zufällige Abschaltungen einzuordnen. Dass
+ein Regelkreis anhält, ist kein Beleg dafür, dass er regelt.
+
+\subsection*{Physikalische Ursache}
+
+Die Ursache liegt im Messprinzip selbst. StallGuard wertet die Phasenverschiebung der im
+Stator induzierten Spannung aus, die mit zunehmender Last wächst. Das Verfahren wurde
+jedoch zur Erkennung eines blockierten Motors entwickelt; die Kennlinie wird erst in der
+Nähe des Kippmoments hinreichend steil, um eine Auswertung zu erlauben.
+
+Am Prüfstand wirkt die Zielkraft von 5~N auf eine einzelne Zahnstange. Über den
+Wälzkreisradius von 8,5~mm entspricht das einem Motormoment von
+
+\begin{equation}
+    M = r \cdot F = 8{,}5\,\mathrm{mm} \cdot 5\,\mathrm{N} = 42{,}5\,\mathrm{Nmm} ,
+    \label{eq:moment_pruefstand}
+\end{equation}
+
+also rund 16~\% des Haltemoments von etwa 260~Nmm. In diesem Lastbereich ist die
+Phasenverschiebung zu gering, um sich vom Rauschen abzuheben.
+
+\subsection*{Reichweite der Aussage}
+
+Die Gültigkeit des Befunds ist auf den untersuchten Lastbereich zu begrenzen. Am
+Prüfstand wird nur eine Zahnstange belastet. Am fertigen Greifer treibt das Ritzel beide
+Zahnstangen, sodass bei gleicher Kraft je Finger das doppelte Motormoment entsteht: 85~Nmm
+zuzüglich Reibung, also rund 38~\% des Haltemoments. Die Messungen wurden damit bei etwa
+der halben Auslastung durchgeführt, die im Zielsystem aufträte.
+
+Eine Eignung des Verfahrens bei dieser höheren Last ist dennoch nicht zu erwarten. Wäre im
+Versuch eine schwache, aber erkennbare Steigung aufgetreten, ließe sich eine Verdopplung
+der Last als möglicher Ausweg diskutieren. Die Messung zeigt jedoch keinerlei
+Lastabhängigkeit, und die Kennlinie von StallGuard verläuft bis in die Nähe des
+Kippmoments flach. Eine abschließende Bestätigung am fertigen Greifer steht aus und wäre
+Gegenstand einer weiterführenden Untersuchung.
+
+\subsection*{Konsequenz}
+
+Aus dem Befund folgte die Entscheidung, die Kraftaufgabe nicht über eine Rückführung der
+Motorlast, sondern über den Positionsregler und das Federmodell zu lösen (Abschnitt
+\ref{sec:kraft_position}). Der Aufwand für Entwurf und Simulation des verworfenen
+Konzepts ist dabei nicht verloren: Die dort entwickelte Wandlungskette von der Position
+über Federweg und Kraft zum Moment bildet die Grundlage des Federmodells, und die
+Erkenntnis über die Grenzen des Messglieds ist ein Ergebnis der Arbeit.

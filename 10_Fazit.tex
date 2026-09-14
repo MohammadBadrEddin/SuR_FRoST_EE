@@ -1,0 +1,133 @@
+% =================================================================
+% Kapitel: Fazit und Ausblick
+% =================================================================
+\label{chap:fazit}
+
+\section{Fazit}
+
+Ziel der Arbeit war die Entwicklung zweier Reglerkonzepte für den Antrieb eines
+Greifers: einer Positionsregelung für die Öffnungsweite und einer Regelung der Greifkraft.
+Beide Aufgaben wurden gelöst, eine davon auf anderem Weg als ursprünglich vorgesehen.
+
+Die Positionsregelung wurde wie geplant entworfen, simuliert und umgesetzt. Ihre
+Auslegung folgt unmittelbar aus der Eigenschaft der Regelstrecke: Da der Treiber im
+Geschwindigkeitsmodus betrieben wird, ist die Strecke ein reiner Integrator, und ein
+Proportionalregler erreicht ohne Integralanteil stationäre Genauigkeit. Die erreichte
+Abweichung von unter 0,05~mm unterschreitet die geforderten $\pm 0{,}5$~mm um den Faktor
+zehn und entspricht der Breite der Totzone, die ihrerseits durch das Verhältnis von
+Mikroschrittauflösung zu Encoderauflösung nach unten begrenzt ist. Die erreichte
+Genauigkeit ist damit nicht durch die Reglerparametrierung, sondern durch die gewählte
+Hardware bestimmt.
+
+Für die Greifkraft war ein zweiter, geschlossener Regelkreis über die StallGuard-Funktion
+des Treibers vorgesehen. Dieses Konzept wurde vollständig ausgelegt, simuliert und
+implementiert, erwies sich am Prüfstand jedoch als nicht tragfähig: Die Messgröße zeigte
+über den gesamten Kraftaufbau keine Lastabhängigkeit. Die Kraftaufgabe wurde daraufhin
+über den bereits validierten Positionsregler und die bekannte Federkennlinie gelöst. Die
+Zielkraft wird dabei in eine Zielposition umgerechnet und angefahren. Die erreichte
+Abweichung liegt bei höchstens 1,6~\% und ist vollständig durch die Positioniergenauigkeit
+erklärbar.
+
+Diese Lösung ist formal keine Kraftregelung, sondern eine modellbasierte Vorsteuerung mit
+geregelter Position. Sie erfordert die Kenntnis der Nachgiebigkeit des Objekts und kann
+Änderungen der Kraft nach dem Greifvorgang nicht erkennen. Sie kommt dafür ohne
+zusätzliche Sensorik aus und macht die geforderte Umschaltung zwischen Positions- und
+Kraftbetrieb strukturell trivial, da beide Betriebsarten denselben Regler verwenden und
+sich lediglich in der Herkunft des Sollwerts unterscheiden.
+
+Tabelle \ref{tab:anforderungsabgleich} stellt die Anforderungen dem erreichten Stand
+gegenüber.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Abgleich der Anforderungen mit dem erreichten Stand}
+    \label{tab:anforderungsabgleich}
+    \begin{tabular}{lp{8.5cm}}
+        \hline
+        Anforderung & Stand \\
+        \hline
+        Echtzeitfähigkeit
+            & überwiegend erfüllt. Kein Drift, Ursache des Jitters bekannt und
+              reproduzierbar; jeder fünfte Zyklus überschreitet die Periodendauer \\[0.3em]
+        Positioniergenauigkeit
+            & erfüllt. Gemessen unter 0,05~mm bei gefordert $\pm 0{,}5$~mm \\[0.3em]
+        Regelbare Greifkraft
+            & erfüllt. Abweichung höchstens 1,6~\%, stufenlos vorgebbar \\[0.3em]
+        Überlast- und Kollisionsschutz
+            & erfüllt \\[0.3em]
+        Nahtlose Umschaltung
+            & erfüllt \\[0.3em]
+        Wiederholgenauigkeit
+            & für die Kraftvorgabe über mehrere Läufe belegt; ein Langzeittest über eine
+              größere Zahl von Greifzyklen wurde nicht durchgeführt \\[0.3em]
+        Dokumentation
+            & erfüllt im Rahmen der angepassten Aufgabenstellung \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+\section{Methodische Erkenntnis}
+
+Über das technische Ergebnis hinaus hat die Arbeit einen Befund hervorgebracht, der
+allgemeiner gilt als der konkrete Anwendungsfall.
+
+Das Simulationsmodell des verworfenen Kraftregelkreises war strukturell korrekt. Die
+Wandlungskette von der Position über Federweg und Kraft zum Motormoment, die
+Vorzeichenumkehr bei der Fehlerbildung, die Quantisierung der Messgröße und die Kopplung
+der Abtastung an das Vollschrittraster bildeten das reale Verhalten zutreffend ab. Die
+Simulation sagte dennoch ein Verhalten voraus, das am realen Aufbau nicht eintrat.
+
+Die Ursache lag nicht in der Struktur des Modells, sondern in zwei Zahlenwerten: dem
+Ruhewert der Sensorkennlinie und ihrer Steigung. Beide waren Annahmen, die nie an der
+Hardware überprüft wurden, weil zum Zeitpunkt der Modellbildung kein Prüfstand existierte.
+Die Simulation konnte damit zeigen, dass die \emph{Regelstruktur} bei einem Messglied mit
+den angenommenen Eigenschaften funktionieren würde -- nicht aber, ob das Messglied diese
+Eigenschaften tatsächlich besitzt.
+
+Die Aussagekraft eines Modells ist durch denjenigen seiner Parameter begrenzt, der am
+schlechtesten abgesichert ist. Im vorliegenden Fall war das nicht der Regler, sondern der
+Sensor. Die in \texttt{params.m} durchgeführte Kennzeichnung der Parameterherkunft nach
+gemessenen, berechneten und angenommenen Werten hätte diesen Umstand bereits vor der
+Inbetriebnahme sichtbar gemacht. Sie sollte nicht als dokumentarischer Aufwand, sondern
+als Teil der Modellbildung verstanden werden.
+
+\section{Ausblick}
+
+Aus dem erreichten Stand ergeben sich mehrere Ansatzpunkte für eine Fortführung.
+
+\subsection*{Automatische Bestimmung des Kontaktpunkts}
+
+Der Kontaktpunkt $x_0$ wird derzeit manuell gesetzt und geht nach Tabelle
+\ref{tab:fehlerquellen} unmittelbar in die Kraft ein. Er ist damit die kritische Größe des
+Verfahrens. Eine automatische Erkennung ist über den Lastwinkel möglich, also über die
+Differenz zwischen dem Schrittzähler des Treibers und der gemessenen Encoderposition.
+Dieser liegt bei Leerfahrt praktisch bei null und springt bei Berührung auf einen
+messbaren Wert. Die dafür erforderlichen Größen werden bereits erfasst.
+
+\subsection*{Beseitigung des Abtastjitters}
+
+Die in Abschnitt \ref{sec:ergebnis_echtzeit} beschriebene Störung der Zykluszeit geht
+ausschließlich auf den blockierenden Zugriff auf \texttt{SG\_RESULT} zurück. Da diese
+Größe für die umgesetzte Kraftvorgabe nicht mehr benötigt wird, ließe sich die Ursache
+durch Entfernen des Zugriffs aus dem Reglertakt vollständig beheben. Alternativ würde eine
+Erhöhung der Baudrate zum Treiber die Dauer des Zugriffs auf unter ein Drittel verkürzen.
+Beide Maßnahmen sind mit geringem Aufwand umsetzbar und würden die Echtzeitanforderung
+vollständig erfüllen.
+
+\subsection*{Überprüfung am fertigen Greifer}
+
+Die Verwerfung der Kraftregelung über StallGuard stützt sich auf Messungen bei rund 16~\%
+Motorauslastung. Am fertigen Greifer, an dem beide Zahnstangen belastet werden, läge die
+Auslastung bei etwa 38~\%. Eine Bestätigung des Befunds unter diesen Bedingungen steht aus.
+Ebenso ist zu prüfen, ob die Kraftvorgabe über das Federmodell an den vorgesehenen
+nachgiebigen Fingern die am Prüfstand erreichte Genauigkeit beibehält.
+
+\subsection*{Weitere Punkte}
+
+Ein Langzeittest über eine größere Zahl aufeinanderfolgender Greifzyklen wurde nicht
+durchgeführt und wäre für eine Aussage zur Langzeitstabilität erforderlich. Darüber hinaus
+wäre für empfindliche Objekte eine Reduktion der Zustellgeschwindigkeit nach dem
+Kontaktpunkt sinnvoll, da die Kraft bei voller Geschwindigkeit mit rund 85~N/s aufgebaut
+wird.

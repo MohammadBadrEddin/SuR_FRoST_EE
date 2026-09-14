@@ -1,0 +1,17 @@
+% Vorstellung der verwendeten Komponenten: FRoST-Endeffektor/Greifer,
+% Schrittmotor (Stepper) und Treiber, STM32H7-Microcontroller, Sensorik
+% zur Strommessung, Entwicklungsumgebung (z.B. STM32CubeIDE, FreeRTOS),
+% Simulationssoftware 
+Die geeigneten Hardware- und Softwarekomponenten zur Durchführung der erläuterten Aufgaben unter Einhaltung der formulierten Anforderungen wurden vereinzelt bereits in der Aufgabenstellung vorgegeben. Die restlichen Komponenten wurden durch eine eingehende Recherche ausgewählt. Folgend sind die verschiedenen ausgewählten Komponenten kurz beschrieben.\\
+
+Durch die Aufgabenstellung vorgegeben war einerseits ein Microcontroller des Typs STM32H7, der aufgrund eines Hardwarefehlers durch das verfügbare Board NUCLEO-F767ZI ersetzt wurde. Andererseits galt die Vorgabe FreeRTOS zur Implementierung des Regelungssystems zu verwenden.\\
+
+Aufgrund des fehlenden Greifers wurde der NEMA17 17HE12-1204S Schrittmotor (1,2 A pro Phase) ausgewählt – dieser war verfügbar und für die Zwecke am Prüfstand ausreichend.\\
+
+Für die Ansteuerung des Schrittmotors wurde der Motortreiber TMC2209 V2.0 ausgewählt, da dieser die Spezifikationen des Schrittmotors (typischerweise 2 A) komfortabel erfüllt, eine UART-Schnittstelle und die Stallguard-Funktion aufweist und zudem gut dokumentiert und vergleichsweise kostengünstig ist. \textcolor{red}{[WEITERE BESCHREIBUNG?]}\\
+
+Zum Auslesen des Motorfeedbacks wurde ein magnetischer Encoder des Typs AS5600 der ams OSRAM Group verwendet, aufgrund \textcolor{red}{...???warum???}\\
+
+Die Entwicklung der beiden Regler wurde in der Programmier- und Berechnungsplattform MATLAB Simulink \textcolor{red}{[VERSION]} vorgenommen.\\
+
+Für die Programmierung von FreeRTOS in der Sprache C auf dem NUCLEO-Board wurde die Entwicklungsumgebung STM32CubeIDE (Version 1.19.0) des Herstellers STMicroelectronics genutzt.

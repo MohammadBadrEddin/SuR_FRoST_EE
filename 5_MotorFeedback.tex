@@ -1,0 +1,175 @@
+
+
+\textit{Bearbeitet von Mohammad Badr Eddin}\\
+
+Für die Positionsregelung des Greifers ist eine zuverlässige Rückführung
+der Position der Motorwelle erforderlich. Hierfür wird ein magnetischer
+Positionssensor eingesetzt, der die Drehstellung der Welle berührungslos
+erfasst. Das erfasste Feedback wird anschließend an den Mikrocontroller
+übertragen und für die Positionsregelung verwendet.
+
+\section{Positionsrückführung mit dem AS5600}
+\label{sec:encoder}
+
+Für die Erfassung der Motorposition wird ein magnetischer
+Drehpositionssensor des Typs AS5600 eingesetzt. Der Sensor arbeitet
+berührungslos und bestimmt die Winkelstellung eines Permanentmagneten,
+der auf der Motorwelle angebracht ist. Dadurch kann die Position der
+Motorwelle erfasst werden, ohne dass eine mechanische Verbindung
+zwischen Sensor und Magnet erforderlich ist.
+
+Der AS5600 besitzt eine interne 12-Bit-Auswertung und kann die
+Winkelstellung über einen Bereich von $0^\circ$ bis $360^\circ$
+erfassen. Damit eignet sich der Sensor für die Rückführung der
+Motorposition innerhalb des Greiferantriebs. Der Sensor wird
+nicht direkt zur Messung der linearen Fingerposition verwendet.
+Stattdessen wird zunächst die Drehbewegung der Motorwelle erfasst und
+die daraus resultierende lineare Bewegung des Greifers später über die
+Kinematik des Zahnstangen-Ritzel-Systems bestimmt.
+
+
+\subsection{Funktionsprinzip des magnetischen Sensors}
+
+Die Winkelmessung des AS5600 basiert auf dem Hall-Effekt. Hierzu wird
+ein Permanentmagnet so angeordnet, dass sich das Magnetfeld im Bereich
+des Sensors mit der Drehung der Motorwelle verändert. Der AS5600
+erfasst dieses Magnetfeld berührungslos und bestimmt daraus die
+Winkelstellung des Magneten.
+
+Für die vorgesehene Anwendung wird ein diametral magnetisierter
+Permanentmagnet verwendet. Bei einer Drehung der Motorwelle dreht sich
+der Magnet entsprechend mit. Die dadurch entstehende Änderung der
+Magnetfeldrichtung wird vom Sensor erfasst und intern in einen
+Winkelwert umgerechnet.
+
+Die interne Auflösung des Sensors beträgt 12 Bit. Der vollständige
+Messbereich wird dadurch in $4096$ diskrete Positionen unterteilt. Die
+Winkelauflösung pro Messschritt beträgt somit
+
+\begin{equation}
+\Delta\varphi
+=
+\frac{360^\circ}{4096}
+\approx 0{,}0879^\circ.
+\end{equation}
+
+Der ausgegebene Winkelwert stellt somit eine absolute Position
+innerhalb einer Umdrehung dar. Eine Erfassung mehrerer Umdrehungen
+erfolgt nicht direkt durch den Sensor, sondern kann bei Bedarf durch
+eine entsprechende Verarbeitung der aufeinanderfolgenden Messwerte
+in der Firmware realisiert werden.
+
+\subsection{Mechanische Integration in den Greifer}
+\label{sec:encoder_montage}
+
+Der AS5600 ist an der Rückseite des Antriebs angeordnet. Der
+Permanentmagnet wurde auf der hinteren Motorwelle befestigt und dreht
+sich somit gemeinsam mit der Welle. Zur Befestigung wurde der Magnet
+mit Schnellkleber auf der Rückseite der Welle fixiert. Der AS5600
+selbst wurde über eine separate Halterung gegenüber dem Magneten
+befestigt.
+
+Für eine zuverlässige Winkelmessung ist die Positionierung des
+Magneten gegenüber dem Sensor entscheidend. Der Magnet muss
+korrekt zum Sensor ausgerichtet sein und sich im vorgesehenen
+Messbereich des AS5600 befinden. Die Halterung sorgt dafür, dass der Sensor gegenüber dem Magneten in der vorgesehenen Position bleibt.
+
+
+% \textit{Bearbeitet von Mohammad Badr Eddin}\\
+
+% Für die Positionsregelung des Greifers ist eine zuverlässige Rückführung der Motorwelleposition erforderlich. Dazu wird die aktuelle Stellung des Antriebs über einen magnetischen Positionssensor erfasst und dem Mikrocontroller zur Verarbeitung bereitgestellt.
+% Die erfasste Feedback ist in dem Fall eine Eingangsgröße für die Positionsregelung. 
+
+% \section{Positionsrückführung mit dem AS5600}
+% \label{sec:encoder}
+
+% Für die Erfassung der Motorposition wird ein magnetischer
+% Drehpositionssensor des Typs AS5600 eingesetzt. Der Sensor arbeitet
+% kontaktlos und bestimmt die Winkelposition eines diametral magnetisierten
+% Permanentmagneten. Die interne Auswertung gibt eine absolute
+% Winkelposition mit einer Auflösung von 12 Bit über einen Bereich von
+% $0^\circ$ bis $360^\circ$ aus.
+
+% Der Sensor ist über die I\textsuperscript{2}C-Schnittstelle mit dem
+% STM32F767 verbunden. Der AS5600 besitzt die 7-Bit-I\textsuperscript{2}C-
+% Adresse $0x36$. Für die Positionsrückführung werden die
+% Register \texttt{RAW\_ANGLE} bei den Adressen $0x0C$ und $0x0D$ verwendet.
+% Diese liefern den 12-Bit-Rohwert der gemessenen Winkelposition. Zusätzlich
+% wird das Statusregister bei Adresse $0x0B$ zur Erkennung des Magneten
+% ausgewertet \cite{AMS}.
+
+% \subsection{Auslesen des Encoderwertes}
+
+% Die Firmware initialisiert den Encoder durch eine I\textsuperscript{2}C-
+% Geräteerkennung. Anschließend wird der Rohwert zyklisch über einen
+% Speicher-Lesezugriff aus den beiden \texttt{RAW\_ANGLE}-Registern
+% ausgelesen. Die beiden Bytes werden zu einem 12-Bit-Wert zusammengesetzt:
+
+% \begin{equation}
+% N_{\mathrm{enc}}
+% =
+% \left(N_{\mathrm{high}} \ll 8\right)
+% \mathbin{|}
+% N_{\mathrm{low}}
+% \end{equation}
+
+% Anschließend werden die nicht verwendeten oberen Bits maskiert. Der
+% resultierende Wertebereich beträgt somit
+
+% \begin{equation}
+% N_{\mathrm{enc}} \in [0,4095].
+% \end{equation}
+
+% Die Winkelauflösung des Sensors beträgt damit
+
+% \begin{equation}
+% \Delta\varphi
+% =
+% \frac{360^\circ}{4096}
+% \approx 0{,}0879^\circ.
+% \end{equation}
+
+
+% \subsection{Umrechnung in die lineare Greiferposition}
+
+% Für die Regelung wird nicht der Winkel des Encoders, sondern die daraus
+% resultierende lineare Position des Greifers verwendet. Das Ritzel besitzt
+% einen Teilkreisdurchmesser von $d=17\,\si{mm}$. Eine vollständige
+% Umdrehung entspricht daher einer Umfangsstrecke von
+
+% \begin{equation}
+% s_{\mathrm{rev}}
+% =
+% \pi d
+% =
+% \pi \cdot 17\,\si{mm}
+% \approx 53{,}41\,\si{mm}.
+% \end{equation}
+
+% Unter der Annahme einer direkten Kopplung zwischen Encoderwelle und Ritzel
+% ergibt sich daraus die lineare Auflösung
+
+% \begin{equation}
+% \Delta x_{\mathrm{enc}}
+% =
+% \frac{s_{\mathrm{rev}}}{4096}
+% =
+% \frac{53{,}41\,\si{mm}}{4096}
+% \approx 0{,}0130\,\si{mm}.
+% \end{equation}
+
+% Ein Encoder-Count entspricht somit etwa $\SI{13}{\micro\meter}$ linearer
+% Bewegung am Ritzel.
+% % +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% % Sensorik
+% % +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% \section{Sensorik zur Strommessung}
+% \textit{[Begründung Auswahl und Auswertung geeigneter Sensorik zur Strommessung]}
+
+
+% % +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% % Signalaufbereitung
+% % +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% \section{Signalaufbereitung}
+% % Filterung, Skalierung der Rohdaten für die Regelung.
+% \textit{[Filterung und Skalierung der Rohdaten für die Regelung]}

@@ -1,0 +1,744 @@
+\textit{Bearbeitet von Masoud Fahim}\\
+
+Die Aufgabenstellung sieht zwei Regler vor: einen Positionsregler für die Öffnungsweite
+und einen Drehmomentregler für die Greifkraft. Der Positionsregler wurde wie vorgesehen
+entworfen und umgesetzt. Für die Greifkraft wurde zunächst ein geschlossener Kraftkreis
+über die StallGuard-Funktion des Treibers entworfen und simuliert; die Messungen am
+Prüfstand zeigten jedoch, dass das Messglied die auftretende Last nicht auflöst. Die
+Kraftaufgabe wird deshalb über den Positionsregler und die bekannte Federkennlinie
+gesteuert. Dieses Kapitel beschreibt beide Wege, weil erst der verworfene Entwurf die
+gewählte Lösung begründet.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Regelstrecke und Reglerstruktur
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Regelstrecke und Wahl der Reglerstruktur}
+\label{sec:strecke}
+
+Der Motortreiber TMC2209 wird nicht über STEP/DIR, sondern über das Register
+\texttt{VACTUAL} angesteuert. In dieser Betriebsart gibt der Mikrocontroller eine
+Sollgeschwindigkeit vor, und der Treiber erzeugt die zugehörigen Mikroschritte
+eigenständig mit einem internen Taktgenerator. Die Stellgröße des Regelkreises ist damit
+eine Geschwindigkeit und keine Position.
+
+Aus dieser Eigenschaft folgt die gesamte weitere Auslegung. Die Position der Zahnstange
+ergibt sich als Zeitintegral der kommandierten Geschwindigkeit, die Regelstrecke ist also
+ein reiner Integrator:
+
+\begin{equation}
+    G(s) = \frac{X(s)}{V(s)} = \frac{1}{s}
+    \label{eq:strecke}
+\end{equation}
+
+Mit einem Proportionalregler $K_P$ lautet der offene Kreis
+
+\begin{equation}
+    L(s) = K_P \cdot G(s) = \frac{K_P}{s} ,
+    \label{eq:offenerkreis}
+\end{equation}
+
+woraus sich die Durchtrittsfrequenz unmittelbar ablesen lässt. Der Betrag von $L(s)$
+erreicht bei $\omega = K_P$ den Wert eins, sodass
+
+\begin{equation}
+    \omega_c = K_P
+    \label{eq:durchtritt}
+\end{equation}
+
+gilt. Die Reglerverstärkung entspricht damit direkt der angestrebten Bandbreite des
+geschlossenen Kreises, was die Parametrierung auf eine einzige Entwurfsentscheidung
+reduziert.
+
+\subsection*{Begründung der reinen P-Struktur}
+
+Die Aufgabenstellung nennt eine Auslegung als PI-, PID- oder Zustandsregelung. Umgesetzt
+wurde ein reiner P-Regler. Diese Abweichung ist keine Vereinfachung, sondern folgt
+zwingend aus der Struktur der Strecke.
+
+Der Integrator, der bei einer PI-Regelung üblicherweise im Regler ergänzt wird, um
+bleibende Regelabweichungen zu vermeiden, ist hier bereits in der Strecke enthalten. Die
+stationäre Genauigkeit ist deshalb ohne zusätzlichen I-Anteil gegeben: Damit die Position
+im Beharrungszustand konstant bleibt, muss die kommandierte Geschwindigkeit null sein.
+Wegen $v = K_P \cdot e$ ist das gleichbedeutend mit einer Regelabweichung von null. Ein
+reiner P-Regler arbeitet an dieser Strecke also stationär exakt.
+
+Ein zusätzlicher I-Anteil würde dagegen einen zweiten Integrator in den offenen Kreis
+einbringen. Der Phasengang läge damit bereits ohne weitere Verzögerungen bei
+$-180^\circ$, und die Stabilität des Kreises hinge allein von der Wahl der
+Reglernullstelle ab. Der Regler wäre schwieriger zu parametrieren, ohne einen Vorteil bei
+der Genauigkeit zu bieten.
+
+Als Nebeneffekt entfällt eine sonst notwendige Anti-Windup-Maßnahme. Bei großen
+Sollwertsprüngen arbeitet der Regler über den größten Teil der Fahrstrecke in der
+Stellgrößenbegrenzung. Ein I-Anteil würde in dieser Zeit einen erheblichen Fehler
+aufsummieren und nach Erreichen der Zielposition ein Überschwingen verursachen. Da kein
+Integralanteil vorhanden ist, tritt dieser Effekt nicht auf, und die Begrenzung kann ohne
+Zusatzlogik implementiert werden.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Positionsregler
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Positionsregler}
+\label{sec:positionsregler}
+
+\subsection*{Wahl der Bandbreite}
+
+Nach Gleichung \ref{eq:durchtritt} entspricht die Reglerverstärkung unmittelbar der
+Bandbreite des geschlossenen Kreises. Die Auslegung reduziert sich damit auf die Frage,
+wie schnell der Kreis sein soll. Als Zielbandbreite wurden $f_c = 20$~Hz gewählt, woraus
+
+\begin{equation}
+    K_P = 2\pi f_c = 2\pi \cdot 20\,\mathrm{Hz} = 125{,}7\,\mathrm{s^{-1}}
+    \label{eq:kp}
+\end{equation}
+
+folgt. Der geschlossene Kreis verhält sich damit im linearen Bereich wie ein
+Verzögerungsglied erster Ordnung mit der Zeitkonstante
+
+\begin{equation}
+    \tau = \frac{1}{K_P} = 7{,}96\,\mathrm{ms} .
+    \label{eq:tau}
+\end{equation}
+
+Der Reglertask läuft mit einer Abtastzeit von $T = 2$~ms, entsprechend 500~Hz. Das
+Produkt $K_P \cdot T = 0{,}251$ liegt deutlich unter eins, sodass der Kreis pro Abtastschritt
+nur einen Bruchteil der verbleibenden Abweichung abbaut und die Diskretisierung das
+Verhalten nicht dominiert.
+
+\subsection*{Stellgrößenbegrenzung}
+
+Die Geschwindigkeit wird auf $v_{max} = 40$~mm/s begrenzt. Dieser Wert ergibt sich aus der
+zulässigen Motordrehzahl und entspricht einem Registerwert von \texttt{VACTUAL}~$= 3351$.
+
+Der Begrenzung nachgeschaltet ist eine Anstiegsbegrenzung mit $a_{max} = 5000$~mm/s².
+Sie ist kein optionales Komfortmerkmal: Der TMC2209 besitzt keinen Rampengenerator und
+setzt eine sprunghaft geänderte Sollgeschwindigkeit unmittelbar um. Ohne softwareseitige
+Begrenzung würde der Antrieb bei jedem Sollwertsprung mit einem Geschwindigkeitssprung
+anfahren, was zu Schrittverlusten führen kann. Die Anstiegsbegrenzung übernimmt damit
+die Funktion, die bei anderen Treibern in der Hardware liegt.
+
+Der Zahlenwert ist nach unten begrenzt durch den Regler selbst. Bei einem Sollwertsprung
+der Höhe $\Delta x$ ändert der Regler seine Ausgangsgröße mit
+$\dot{v} = K_P^2 \cdot \Delta x$, bei einem Sprung von 0,2~mm also mit rund
+3160~mm/s². Eine Anstiegsbegrenzung unterhalb dieses Wertes würde den Regler ausbremsen
+und den Kreis verlangsamen, statt ihn zu schützen.
+
+\subsection*{Totzone und Grenzzyklus}
+
+Ohne weitere Maßnahme kommt der Antrieb im Stillstand nicht zur Ruhe. Ursache ist das
+Verhältnis der beiden Auflösungen im Kreis. Ein Mikroschritt entspricht an der Zahnstange
+
+\begin{equation}
+    \Delta x_{\mu} = \frac{\pi \cdot d}{n_{voll} \cdot n_{\mu}}
+    = \frac{\pi \cdot 17\,\mathrm{mm}}{200 \cdot 16} = 0{,}01669\,\mathrm{mm} ,
+    \label{eq:mikroschritt}
+\end{equation}
+
+während eine Stufe des Encoders
+
+\begin{equation}
+    \Delta x_{enc} = \frac{\pi \cdot d}{2^{12}}
+    = \frac{53{,}407\,\mathrm{mm}}{4096} = 0{,}01304\,\mathrm{mm}
+    \label{eq:encoderstufe}
+\end{equation}
+
+beträgt. Der kleinstmögliche Stellschritt des Aktors ist damit um den Faktor 1,28 größer
+als die kleinste auflösbare Messgröße. Der Motor kann folglich nicht auf einer
+Encoderstufe zum Stehen kommen, sondern springt über sie hinweg. Der Regler erkennt die
+entstandene Abweichung, korrigiert zurück, springt erneut darüber und so fort. Das
+Ergebnis ist ein Grenzzyklus, der sich als dauerhaftes Pendeln der Geschwindigkeit um den
+Nullpunkt äußert und am realen Antrieb als Brummen im Stillstand hörbar wird.
+
+Abhilfe schafft eine Totzone unmittelbar hinter dem Summierer, die Abweichungen unterhalb
+einer Schwelle nicht mehr korrigiert. Rechnerisch genügen dafür zwei Encoderstufen, also
+0,026~mm. Am realen Aufbau erwies sich dieser Wert als zu klein: Die Herleitung
+berücksichtigt ausschließlich die Quantisierung, nicht jedoch das Rauschen des
+Messsignals. Die Totzone wurde deshalb auf 0,05~mm erhöht, was etwa vier Encoderstufen
+entspricht. Erst mit diesem Wert geht die Geschwindigkeit im Stillstand auf null.
+
+Die Totzone führt eine bleibende Positionsabweichung von bis zu 0,05~mm ein. Dieser
+Kompromiss ist bewusst gewählt und nicht regelungstechnisch, sondern durch die Hardware
+begründet: Feiner zu regeln, als der Aktor stellen kann, führt zwangsläufig zum
+Grenzzyklus. Gegenüber der geforderten Positioniergenauigkeit von $\pm 0{,}5$~mm bleibt
+ein Sicherheitsfaktor von zehn.
+
+\subsection*{Aufbereitung des Messsignals}
+
+Vereinzelt traten auf dem über I$^2$C gelesenen Encoderwert einzelne stark abweichende
+Messwerte auf. Da der Regler proportional auf die Abweichung reagiert, würde ein solcher
+Ausreißer unmittelbar in einen Geschwindigkeitssprung umgesetzt. Dem Encoderwert ist
+deshalb ein Medianfilter über drei Werte nachgeschaltet. Er unterdrückt einzelne Spikes
+vollständig, ohne die Dynamik des Kreises nennenswert zu verzögern, da er im Gegensatz zu
+einem Mittelwertfilter keine Glättung über mehrere gültige Messwerte vornimmt.
+
+\subsection*{Stabilitätsgrenzen}
+
+Der Entwurfswert von $K_P = 125{,}7\,\mathrm{s^{-1}}$ ist nach oben durch zwei Effekte
+begrenzt, die im kontinuierlichen Modell nach Gleichung \ref{eq:strecke} nicht enthalten
+sind.
+
+Die Abtastung führt eine Grenze ein, oberhalb derer der diskrete Kreis instabil wird. Für
+$K_P \cdot T > 1$ überschreitet der Kreis das Ziel innerhalb eines Takts, ab
+$K_P \cdot T = 2$ läuft er auf. Bei $T = 2$~ms entspricht das einer Grenze von
+$K_P = 1000\,\mathrm{s^{-1}}$.
+
+Die zweite Grenze stammt aus der Motordynamik. Der Rotor folgt dem Statorfeld nicht starr,
+sondern als Feder-Masse-System aus magnetischer Steifigkeit und Trägheit. Bei dessen
+Eigenfrequenz $\omega_0$ trägt dieses Schwingungsglied zusätzlich $-90^\circ$ zur bereits
+vorhandenen Phasendrehung des Integrators bei, sodass der Kreis dort auf der kritischen
+Phasenlage liegt. Über die Stabilität entscheidet dann allein der Betrag, woraus sich
+
+\begin{equation}
+    K_{P,max} = 2 \zeta \omega_0
+    \label{eq:resonanzgrenze}
+\end{equation}
+
+ergibt. Mit $\omega_0 = 628\,\mathrm{rad/s}$ liefert diese Bedingung je nach Dämpfung
+sehr unterschiedliche Werte, wie Tabelle \ref{tab:stabilitaetsgrenzen} zeigt.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Grenzen für $K_P$ aus Abtastung und Motorresonanz}
+    \label{tab:stabilitaetsgrenzen}
+    \begin{tabular}{lcc}
+        \hline
+        Ursache & Grenze für $K_P$ & Reserve zum Entwurfswert \\
+        \hline
+        Abtastung, $T = 2$~ms          & 1000 & Faktor 8 \\
+        Motorresonanz, $\zeta = 0{,}20$ & 251  & Faktor 2 \\
+        Motorresonanz, $\zeta = 0{,}10$ & 126  & keine \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+Die schärfere der beiden Bedingungen ist damit nicht die Abtastung, sondern die Resonanz.
+Bemerkenswert ist der Fall $\zeta = 0{,}1$: Die verbreitete Faustregel, die Bandbreite
+höchstens auf ein Fünftel der Resonanzfrequenz zu legen, ist rechnerisch identisch mit
+Gleichung \ref{eq:resonanzgrenze} für genau diese Dämpfung. Die Faustregel unterstellt
+also stillschweigend einen Zahlenwert, der im vorliegenden Fall nicht bekannt war.
+
+Die Dämpfung wurde nicht messtechnisch bestimmt. Für die Inbetriebnahme wurde deshalb ein
+reduzierter Startwert von $K_P = 100\,\mathrm{s^{-1}}$ vorgesehen. Der anschließende
+Betrieb bei $K_P = 125{,}7\,\mathrm{s^{-1}}$ verlief ohne erkennbare Schwingneigung, was
+nach Gleichung \ref{eq:resonanzgrenze} auf eine Dämpfung oberhalb von 0,1 schließen lässt.
+Die Auslegung ist damit nachträglich abgesichert, ohne dass $\zeta$ als Zahlenwert
+vorliegt.
+
+\subsection*{Struktur des Regelkreises}
+
+Abbildung \ref{fig:positionsregelkreis} fasst die beschriebenen Elemente zusammen.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=5mm,
+    blk/.append style={text width=14mm}]
+
+  \node (soll)                        {};
+  \node[sum, right=8mm of soll] (s)   {$\pm$};
+  \node[blk, right=6mm of s]    (dz)  {Totzone\\[-1pt]\tiny 0,05\,mm};
+  \node[blk, right=3mm of dz]   (kp)  {$K_P$\\[-1pt]\tiny 125,7\,s$^{-1}$};
+  \node[blk, right=3mm of kp]   (sat) {Sättigung\\[-1pt]\tiny $\pm$40\,mm/s};
+  \node[blk, right=3mm of sat]  (rl)  {Rate Limiter\\[-1pt]\tiny 5000\,mm/s$^2$};
+  \node[blk, right=3mm of rl]   (tmc) {Aktor\\[-1pt]\tiny TMC2209};
+  \node[blk, right=3mm of tmc]  (int) {Integrator\\[-1pt]\tiny $1/s$};
+
+  \coordinate[right=8mm of int] (tap);
+  \node[right=1mm of tap, lbl] (xist) {$x$};
+
+  \draw[sig] ($(soll)+(-6mm,0)$) -- node[lbl,above,pos=0.3]{$x_{soll}$} (s);
+  \draw[sig] (s)   -- (dz);
+  \draw[sig] (dz)  -- (kp);
+  \draw[sig] (kp)  -- (sat);
+  \draw[sig] (sat) -- (rl);
+  \draw[sig] (rl)  -- (tmc);
+  \draw[sig] (tmc) -- (int);
+  \draw[line] (int) -- (tap);
+  \fill (tap) circle (1.2pt);
+
+  \node[lbl, above left=-1mm and -2mm of s]     {$+$};
+  \node[lbl, below left=-1.5mm and -3.5mm of s] {$-$};
+
+  \node[msg, below=16mm of $(kp)!0.5!(sat)$] (enc)
+        {Messglied -- AS5600\\[-1pt]\tiny 0,01304\,mm je Count, Median-3};
+
+  \draw[sig] (tap) |- (enc.east);
+  \draw[sig] (enc.west) -| (s);
+
+  \node[grp] at ($(dz.north)!0.5!(sat.north)+(0,4.5mm)$)  {Regler und Grenzen};
+  \node[grp] at ($(tmc.north)!0.5!(int.north)+(0,4.5mm)$) {Aktor und Strecke};
+
+\end{tikzpicture}
+\caption{Blockschaltbild des Positionsregelkreises. Der Integrator ist Teil der
+         Regelstrecke, nicht des Reglers.}
+\label{fig:positionsregelkreis}
+\end{figure}
+% ---------------------------------------------------------------
+
+Tabelle \ref{tab:reglerparameter} stellt die Parameter des Reglers zusammen.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Parameter des Positionsreglers}
+    \label{tab:reglerparameter}
+    \begin{tabular}{llp{6cm}}
+        \hline
+        Größe & Wert & Herkunft \\
+        \hline
+        $T$        & 2~ms                    & Periode des Reglertasks \\
+        $K_P$      & 125,7~s$^{-1}$          & $2\pi \cdot 20$~Hz \\
+        $v_{max}$  & 40~mm/s                 & zulässige Verfahrgeschwindigkeit \\
+        $a_{max}$  & 5000~mm/s²              & oberhalb $K_P^2 \cdot \Delta x$ \\
+        Totzone    & 0,05~mm                 & rund vier Encoderstufen \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Kraftregelung über StallGuard - Entwurf
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Kraftregelung über StallGuard}
+\label{sec:sg_entwurf}
+
+Für die Greifkraft war ursprünglich ein zweiter, geschlossener Regelkreis vorgesehen. Da
+die Aufgabenstellung die zunächst angedachte Strommessung ausschließt und ein Kraftsensor
+nicht vorhanden ist, bot sich die im Treiber bereits implementierte StallGuard-Funktion
+als Messglied an. Dieser Abschnitt beschreibt den Entwurf. Die messtechnische
+Überprüfung und die daraus folgende Verwerfung des Konzepts werden in Abschnitt
+\ref{sec:sg_verwerfung} behandelt.
+
+\subsection*{SG\_RESULT als Messgröße}
+
+Der Rotor eines Schrittmotors ist ein Permanentmagnet und induziert bei Drehung eine
+Spannung in den Statorwicklungen. Unter Last bleibt er weiter hinter dem umlaufenden
+Statorfeld zurück, wodurch sich die Phasenlage dieser Spannung verschiebt. Der TMC2209
+wertet diesen Zusammenhang intern aus und stellt das Ergebnis als Registerwert
+\texttt{SG\_RESULT} bereit.
+
+Entscheidend für den Reglerentwurf ist das Vorzeichen dieser Kennlinie. StallGuard wurde
+zur Erkennung eines blockierten Motors entwickelt, der ausgegebene Wert läuft daher mit
+steigender Last gegen null. Ein hoher Messwert bedeutet also eine geringe Belastung. Für
+die Fehlerbildung folgt daraus
+
+\begin{equation}
+    e = \mathrm{SG_{ist}} - \mathrm{SG_{soll}} ,
+    \label{eq:sg_fehler}
+\end{equation}
+
+also Ist minus Soll und damit genau umgekehrt zum Positionsregler. Wird diese Umkehrung
+übersehen, ergibt sich ein selbsterhaltender Stillstand: Der Regler berechnet eine
+negative Stellgröße, die von der Begrenzung auf null abgeschnitten wird, der Antrieb
+bewegt sich nicht, und die Messgröße ändert sich folglich ebenfalls nicht.
+
+\subsection*{Die Wandlungskette}
+
+Anders als beim Positionsregler, bei dem der Encoder die Regelgröße unmittelbar misst,
+liegt zwischen Stellgröße und Messgröße eine Kette physikalischer Umwandlungen. Jedes
+Glied dieser Kette ist ein eigener Modellblock:
+
+\begin{align}
+    \Delta x &= \max(x - x_K,\; 0) \label{eq:kette_weg}\\
+    F        &= c_{ers} \cdot \Delta x \label{eq:kette_kraft}\\
+    M        &= 2 \cdot r \cdot F + M_{reib} \label{eq:kette_moment}\\
+    \mathrm{SG} &= \mathrm{SG_0} - k_{SG} \cdot M \label{eq:kette_sg}
+\end{align}
+
+Gleichung \ref{eq:kette_weg} bildet den Kontakt ab. Die Begrenzung auf nichtnegative Werte
+ist nicht rechentechnischer Natur, sondern physikalisch: Ein nachgiebiges Objekt kann
+drücken, aber nicht ziehen. Solange der Finger den Kontaktpunkt $x_K$ nicht erreicht hat,
+ist die Kraft exakt null.
+
+Der Faktor zwei in Gleichung \ref{eq:kette_moment} berücksichtigt, dass das Ritzel beide
+Zahnstangen gleichzeitig antreibt und sich die Momente beider Finger am Motor addieren.
+Bei einem Wälzkreisradius von $r = 8{,}5$~mm entspricht damit jedes Newton Greifkraft je
+Finger einem Motormoment von 17~Nmm. Das Reibmoment $M_{reib}$ liegt auch bei Leerfahrt
+an und wird deshalb additiv berücksichtigt und nicht in den Kontaktblock gezogen.
+
+Für die Zielkraft von 5~N je Finger ergibt sich daraus ein Nutzmoment von 85~Nmm,
+zuzüglich eines geschätzten Reibmoments von 15~Nmm also rund 100~Nmm. Bezogen auf das
+Haltemoment des Motors von etwa 260~Nmm entspricht das einer Auslastung von 38~Prozent.
+
+\subsection*{Reglerstruktur}
+
+Der Regler selbst entspricht strukturell dem Positionsregler: Proportionalglied,
+Stellgrößenbegrenzung, Anstiegsbegrenzung. Die Verstärkung $K_v$ ist in mm/s je Zählschritt
+angegeben.
+
+Ein Unterschied betrifft die Stellgrößenbegrenzung. Ihre untere Grenze liegt nicht bei
+$-v_{max}$, sondern bei null. Der Greifer soll während des Kraftaufbaus unter keinen
+Umständen zurückfahren, da ein Richtungswechsel zunächst das Flankenspiel der Verzahnung
+durchläuft und die aufgebrachte Kraft dabei schlagartig auf null fällt. Der Kraftaufbau
+ist damit eine ausschließlich monotone Zustellbewegung.
+
+Für die Verstärkung selbst existiert keine Auslegungsformel analog zu Gleichung
+\ref{eq:kp}, da die Strecke in diesem Zweig keine geschlossene Übertragungsfunktion
+besitzt. $K_v$ wurde deshalb so gewählt, dass die Zufahrgeschwindigkeit bei unbelastetem
+Antrieb oberhalb der Gültigkeitsgrenze von \texttt{SG\_RESULT} liegt: Unterhalb von etwa
+5~mm/s ist die induzierte Spannung zu klein und der Messwert wird zu Rauschen.
+
+\subsection*{Strukturelle Grenze des Konzepts}
+
+\texttt{SG\_RESULT} wird nicht zeitgetaktet aktualisiert, sondern einmal je Vollschritt,
+also alle 0,267~mm Verfahrweg. Aus dieser Eigenschaft folgen zwei Einschränkungen, die
+bereits im Entwurf erkennbar waren.
+
+Zum einen hängt die Zahl der Messwerte, die während des Kraftaufbaus überhaupt anfallen,
+ausschließlich von der Nachgiebigkeit des Objekts ab:
+
+\begin{equation}
+    N = \frac{F_{soll}}{c_{ers} \cdot \Delta x_{voll}}
+    \label{eq:messwerte}
+\end{equation}
+
+Die Geschwindigkeit kürzt sich heraus. Langsameres Zufahren erhöht die Zahl der Messwerte
+also nicht. Fordert man mindestens zehn Stützstellen zwischen Kontakt und Zielkraft, damit
+von einer Regelung und nicht von einem Schwellwertschalter gesprochen werden kann, folgt
+daraus die Auslegungsgrenze
+
+\begin{equation}
+    c_{ers} < \frac{F_{soll}}{10 \cdot \Delta x_{voll}} = 1{,}87\,\mathrm{N/mm} .
+    \label{eq:steifigkeitsgrenze}
+\end{equation}
+
+Oberhalb dieser Steifigkeit springt die gemessene Kraft von einem zu kleinen auf einen zu
+großen Wert, ohne dass ein Zwischenschritt existiert, an dem der Regler eingreifen könnte.
+
+Zum anderen öffnet sich der Kreis genau dann, wenn er sein Ziel erreicht. Mit
+verschwindender Geschwindigkeit wächst das Abtastintervall über alle Grenzen, und die
+Rückführung friert auf dem zuletzt gemessenen Wert ein. Was danach geschieht -- Kriechen
+des Materials, Temperaturdrift, ein Lastwechsel -- ist strukturell unsichtbar. Formal
+handelt es sich damit nicht um eine Kraftregelung im Arbeitspunkt, sondern um eine
+gesteuerte Zustellbewegung mit ereignisgetriggertem Abbruch.
+
+Beide Einschränkungen wurden in der Simulation bestätigt und in der Auslegung
+berücksichtigt. Sie waren jedoch nicht der Grund für die spätere Verwerfung des Konzepts;
+diese beruht auf einem Befund am Messglied selbst, der sich erst am Prüfstand zeigte
+(Abschnitt \ref{sec:sg_verwerfung}).
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Kraftregelung über Position und Federmodell
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Kraftvorgabe über Position und Federmodell}
+\label{sec:kraft_position}
+
+Nachdem sich \texttt{SG\_RESULT} als Messglied für die auftretende Last als ungeeignet
+erwiesen hat, wurde die Kraftaufgabe auf einem anderen Weg gelöst. Grundlage ist die
+Überlegung, dass bei bekannter Nachgiebigkeit des Objekts Kraft und Weg über das
+Hookesche Gesetz eindeutig zusammenhängen. Eine Kraftvorgabe lässt sich damit in eine
+Positionsvorgabe umrechnen und an den bereits vorhandenen, validierten Positionsregler
+übergeben.
+
+\subsection*{Prinzip}
+
+Ein eigener Kraftregelkreis existiert nicht. Die Zielposition ergibt sich aus dem
+Kontaktpunkt $x_0$ und dem für die gewünschte Kraft erforderlichen Federweg:
+
+\begin{equation}
+    x_{soll} = x_0 + \frac{F_{soll}}{c_{eff}}
+    \label{eq:kraft_vorsteuerung}
+\end{equation}
+
+Die tatsächlich aufgebrachte Kraft folgt umgekehrt aus der gemessenen Position:
+
+\begin{equation}
+    F = c_{eff} \cdot (x_{ist} - x_0)
+    \label{eq:kraft_rueckrechnung}
+\end{equation}
+
+Bezogen auf die Kraft ist dies ein offener Kreis: Sie wird berechnet, nicht gemessen. Der
+darin eingebettete Positionskreis bleibt dagegen geschlossen und korrigiert jede
+Abweichung der Position. Abbildung \ref{fig:gesamtstruktur} zeigt diese Schachtelung.
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=5mm, scale=0.92, transform shape]
+
+  \node (fin) {};
+  \node[ghost, right=9mm of fin] (gs)  {$\pm$};
+  \node[blk, right=7mm of gs]    (inv) {$1/c_{e\!f\!f}$\\[-1pt]\tiny 2,12\,N/mm};
+  \node[blk, right=5mm of inv]   (x0)  {$+\,x_0$\\[-1pt]\tiny Kontaktpunkt};
+  \node[blkw, right=14mm of x0, fill=black!6] (pos)
+        {\textbf{Positionsregelkreis}\\[-1pt]\tiny geschlossen, Abb.~\ref{fig:positionsregelkreis}};
+  \node[blkw, right=14mm of pos] (fed)
+        {Feder (Strecke)\\[-1pt]\tiny $F=c_{e\!f\!f}(x-x_0)$};
+
+  \coordinate[right=8mm of fed] (fout);
+  \node[right=1mm of fout, lbl] {$F$};
+
+  \draw[sig] ($(fin)+(-6mm,0)$) -- node[lbl,above,pos=0.3]{$F_{soll}$} (gs);
+  \draw[sig] (gs)  -- (inv);
+  \draw[sig] (inv) -- (x0);
+  \draw[sig] (x0)  -- node[lbl,above=0.5mm]{$x_{soll}$} (pos);
+  \draw[sig] (pos) -- node[lbl,above=0.5mm]{$x_{ist}$} (fed);
+  \draw[line] (fed) -- (fout);
+  \fill (fout) circle (1.2pt);
+
+  \begin{scope}[on background layer]
+    \node[draw, dashed, black!45, rounded corners=2pt,
+          inner sep=2mm, fit=(pos)] (innen) {};
+  \end{scope}
+  \node[grp, above=1mm of innen] {geregelt};
+
+  \draw[line, dashed, black!55] (fout) -- ++(0,-16mm) coordinate (fb2);
+  \draw[line, dashed, black!55] (fb2) -| ($(gs)+(0,-16mm)$);
+  \draw[miss] ($(gs)+(0,-16mm)$) -- (gs);
+
+  \coordinate (xm) at ($(fb2)!0.55!($(gs)+(0,-16mm)$)$);
+  \fill[white] ($(xm)+(-2mm,-2mm)$) rectangle ($(xm)+(2mm,2mm)$);
+  \draw[red!60!black, line width=0.9pt]
+        ($(xm)+(-1.6mm,-1.6mm)$) -- ($(xm)+(1.6mm,1.6mm)$);
+  \draw[red!60!black, line width=0.9pt]
+        ($(xm)+(-1.6mm,1.6mm)$) -- ($(xm)+(1.6mm,-1.6mm)$);
+  \node[font=\scriptsize, text=red!60!black, below=1mm of xm]
+        {keine Kraftrückführung};
+
+\end{tikzpicture}
+\caption{Gesamtstruktur der Kraftvorgabe. Der Positionsregelkreis bildet den
+         geschlossenen Kern; der Kraftpfad darum herum ist offen. Die gestrichelte
+         Linie markiert die Stelle, an der eine echte Kraftregelung ihre Rückführung
+         hätte.}
+\label{fig:gesamtstruktur}
+\end{figure}
+% ---------------------------------------------------------------
+
+\subsection*{Ablauf eines Greifvorgangs}
+
+Der Kontaktpunkt $x_0$ ist der einzige Parameter, der nicht aus der Auslegung stammt,
+sondern im Versuch bestimmt werden muss. Der Ablauf gliedert sich daher in vier Schritte:
+
+\begin{enumerate}
+    \item Der Finger wird positionsgeregelt zugestellt, bis das Objekt gerade berührt wird.
+    \item Die aktuelle Position wird als Kontaktpunkt $x_0$ übernommen.
+    \item Die Zielposition wird nach Gleichung \ref{eq:kraft_vorsteuerung} berechnet und
+          angefahren.
+    \item Der Antrieb hält diese Position. Die Kraft steht.
+\end{enumerate}
+
+Die Übernahme von $x_0$ erfolgt derzeit manuell über die Bedienoberfläche. Eine
+automatische Erkennung ist möglich, indem der Lastwinkel -- die Differenz zwischen dem
+Schrittzähler des Treibers und der gemessenen Encoderposition -- ausgewertet wird. Dieser
+liegt bei Leerfahrt praktisch bei null und springt bei Berührung auf einen messbaren Wert.
+
+Für die Zielkraft von 5~N ergibt sich bei der am Prüfstand wirksamen Steifigkeit von
+$c_{eff} = 2{,}12$~N/mm ein Federweg von 2,36~mm, bei 10~N entsprechend 4,72~mm.
+
+\subsection*{Genauigkeit und Fehlerempfindlichkeit}
+
+Da die Kraft nicht gemessen wird, geht jeder Fehler im Modell oder in der Position
+unmittelbar und unkorrigiert in die Kraft ein. Die erreichbare Genauigkeit folgt damit
+direkt aus der Positioniergenauigkeit. Mit der Totzone von 0,05~mm aus Abschnitt
+\ref{sec:positionsregler} ergibt sich
+
+\begin{equation}
+    \Delta F = c_{eff} \cdot \Delta x = 2{,}12\,\mathrm{N/mm} \cdot 0{,}05\,\mathrm{mm}
+    = 0{,}11\,\mathrm{N} .
+    \label{eq:kraftfehler}
+\end{equation}
+
+Bemerkenswert ist das Skalierungsverhalten: Die \emph{absolute} Kraftgenauigkeit
+verschlechtert sich linear mit der Steifigkeit. Bei einer einzelnen Feder mit 1,06~N/mm
+läge der Fehler bei nur 0,05~N. Konstant bleibt lediglich der auf den Federweg bezogene
+\emph{relative} Fehler, da sich der erforderliche Federweg umgekehrt proportional zu
+$c_{eff}$ verhält. Daraus folgt unmittelbar die Anwendungsgrenze des Verfahrens: An einem
+sehr steifen Objekt wird der Federweg so klein, dass die Positionsauflösung die Kraft
+nicht mehr sinnvoll auflöst.
+
+Ein Vergleich der drei Fehlerquellen zeigt, welche Größe die Genauigkeit tatsächlich
+bestimmt. Da alle Zusammenhänge linear sind, lassen sich die Beiträge unmittelbar
+angeben; eine Parameterstudie ist dafür nicht erforderlich.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Einfluss der Fehlerquellen auf die Greifkraft bei $F_{soll} = 5$~N und
+             $c_{eff} = 2{,}12$~N/mm}
+    \label{tab:fehlerquellen}
+    \begin{tabular}{lcc}
+        \hline
+        Fehlerquelle & Kraftfehler & bezogen auf $F_{soll}$ \\
+        \hline
+        Totzone, $\pm 0{,}05$~mm          & $\pm 0{,}11$~N & 2,1~\% \\
+        Kontaktpunkt $x_0$ um 0,5~mm falsch & 1,06~N        & 21,2~\% \\
+        $c_{eff}$ um 5~\% falsch           & 0,25~N        & 5,0~\% \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+Die Bestimmung des Kontaktpunkts ist damit die kritische Größe des Verfahrens. Ein Fehler
+von einem halben Millimeter, wie er bei manueller Zustellung ohne weitere Hilfsmittel
+durchaus auftreten kann, wirkt sich zehnmal stärker aus als die gesamte
+Positionierungenauigkeit des Reglers. Die Güte der Kraftvorgabe hängt folglich weniger am
+Regler als an der Reproduzierbarkeit des Kontaktpunkts und an der Kenntnis der
+Steifigkeit.
+
+\subsection*{Einordnung}
+
+Formal handelt es sich bei dem beschriebenen Verfahren um eine \emph{modellbasierte
+Vorsteuerung mit geregelter Position} und nicht um eine Kraftregelung. Die Unterscheidung
+ist nicht nur begrifflich, sondern bestimmt, welche Störungen ausgeregelt werden und
+welche nicht:
+
+\begin{itemize}
+    \item \textbf{Keine Rückführung der Kraft.} Alles, was nach dem Anfahren der
+          Zielposition geschieht -- Kriechen des Materials, Temperaturdrift, ein
+          Lastwechsel am Objekt -- bleibt unbemerkt.
+    \item \textbf{Die Steifigkeit muss bekannt sein.} An einem unbekannten Objekt ist das
+          Verfahren nicht anwendbar, ohne $c_{eff}$ vorher zu bestimmen.
+    \item \textbf{Der Kontaktpunkt geht direkt in die Kraft ein.} Er ist kein
+          Auslegungsparameter, sondern muss bei jedem Greifvorgang neu ermittelt werden.
+\end{itemize}
+
+Diesen Einschränkungen steht gegenüber, dass das Verfahren ohne zusätzliche Sensorik
+auskommt, auf einem bereits validierten Regelkreis aufsetzt und die geforderte
+Umschaltung zwischen Positions- und Kraftbetrieb strukturell trivial macht: Beide
+Betriebsarten nutzen denselben Regler und unterscheiden sich lediglich in der Herkunft
+des Sollwerts. Die messtechnische Überprüfung erfolgt in Abschnitt
+\ref{sec:ergebnis_kraft}.
+
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+% Umschaltlogik und Zustandsautomat
+% +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\section{Umschaltlogik und Zustandsautomat}
+\label{sec:zustandsautomat}
+
+Der Regler allein bildet nur einen Ausschnitt eines Greifvorgangs ab. Er berechnet aus
+einer Abweichung eine Geschwindigkeit, weiß aber nicht, woher sein Sollwert stammt, ob
+gerade referenziert, angenähert oder gegriffen wird und wie im Fehlerfall zu reagieren
+ist. Diese Entscheidungen trifft eine übergeordnete Ablaufsteuerung, die als
+Zustandsautomat im selben 2-ms-Task ausgeführt wird.
+
+\subsection*{Zustände}
+
+Die Ablaufsteuerung umfasst sechs Zustände. Tabelle \ref{tab:zustaende} fasst ihre
+Aufgaben zusammen, Abbildung \ref{fig:zustandsautomat} zeigt die Übergänge.
+
+% ---------------------------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Zustände der Ablaufsteuerung}
+    \label{tab:zustaende}
+    \begin{tabular}{llp{7.5cm}}
+        \hline
+        Zustand & Nr. & Aufgabe \\
+        \hline
+        \texttt{ST\_ZERO}      & 1 & Referenzfahrt, Nullpunkt setzen \\
+        \texttt{ST\_DIRDETECT} & 2 & Bestimmung der Encoderrichtung \\
+        \texttt{ST\_CONTROL}   & 3 & regulärer Regelbetrieb, Position oder Kraft \\
+        \texttt{ST\_HOLD}      & 4 & Halten der erreichten Position bzw. Kraft \\
+        \texttt{ST\_FAULT}     & 5 & Fehlerzustand, Motor gestoppt \\
+        \texttt{ST\_OPEN}      & 6 & Öffnen und Lösen des Objekts \\
+        \hline
+    \end{tabular}
+\end{table}
+% ---------------------------------------------------------------
+
+% ---------------------------------------------------------------
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm]
+
+  \node[zst, fill=white] (idle) at (0,0)   {Idle\\[-1pt]\tiny nach dem Start};
+  \node[zst]  (zero) at (3.4,0)            {\texttt{ST\_ZERO}\\[-1pt]\tiny Referenzfahrt};
+  \node[zst]  (dir)  at (6.8,0)            {\texttt{ST\_DIRDETECT}\\[-1pt]\tiny Richtungs\-erkennung};
+  \node[zst]  (ctrl) at (10.2,0)           {\texttt{ST\_CONTROL}\\[-1pt]\tiny Regelbetrieb};
+
+  \node[zflt] (flt)  at (1.7,-2.4)         {\texttt{ST\_FAULT}\\[-1pt]\tiny Motor gestoppt};
+  \node[zst]  (open) at (6.8,-2.4)         {\texttt{ST\_OPEN}\\[-1pt]\tiny Öffnen};
+  \node[zst]  (hold) at (10.2,-2.4)        {\texttt{ST\_HOLD}\\[-1pt]\tiny Kraft halten};
+
+  \draw[ztr] (idle) -- node[above]{Kommando}      (zero);
+  \draw[ztr] (zero) -- node[above]{Nullpunkt}     (dir);
+  \draw[ztr] (dir)  -- node[above]{Richtung}      (ctrl);
+  \draw[ztr] (ctrl) -- node[right]{Ziel erreicht} (hold);
+  \draw[ztr] (hold) -- node[below]{Kommando}      (open);
+  \draw[ztr] (open.north east) -- node[above,pos=0.55,sloped]{fertig} (ctrl.south west);
+
+  \draw[ztrd] (zero.south)     -- (flt.north east);
+  \draw[ztrd] (dir.south west) -- (flt.north);
+  \draw[ztrd] (open.west)      -- (flt.east);
+
+  \node[grp, below=3mm of flt, text width=54mm, align=left]
+        {gestrichelt: Fehlerbedingung. Sie führt aus \emph{jedem}
+         Zustand nach \texttt{ST\_FAULT}; verlassen wird dieser nur
+         durch einen Neustart.};
+
+\end{tikzpicture}
+\caption{Zustände und Übergänge der Ablaufsteuerung.}
+\label{fig:zustandsautomat}
+\end{figure}
+% ---------------------------------------------------------------
+
+\subsection*{Bestimmung der Encoderrichtung}
+
+Der Zustand \texttt{ST\_DIRDETECT} verdient besondere Erwähnung, da er im ursprünglichen
+Entwurf nicht vorgesehen war. Die Zuordnung zwischen der Zählrichtung des Encoders und
+der Verfahrrichtung des Antriebs hängt davon ab, wie der Magnet auf der Welle sitzt und
+wie der Sensor gegenüber der Mechanik orientiert ist. Sie ist aus der Konstruktion nicht
+zuverlässig ableitbar.
+
+Diese Zuordnung ist kein Randdetail. Bei falschem Vorzeichen wird aus der Gegenkopplung
+des Regelkreises eine Mitkopplung: Die Regelabweichung wächst mit jedem Takt, der Regler
+erhöht daraufhin die Geschwindigkeit weiter, und der Antrieb läuft weg, statt zu regeln.
+Statt die Richtung als Konstante im Code festzulegen und bei einem Umbau auf einen Fehler
+zu warten, wird sie beim Start experimentell bestimmt: Der Antrieb fährt mit einer kleinen,
+festen Geschwindigkeit, und aus dem Vorzeichen der Encoderänderung wird die Zuordnung
+abgeleitet.
+
+\subsection*{Umschaltung zwischen den Betriebsarten}
+
+Die Anforderung einer nahtlosen Umschaltung zwischen Positions- und Kraftbetrieb während
+des laufenden Betriebs wird über die Variable \texttt{g\_ctrl\_mode} umgesetzt, die zur
+Laufzeit über ein Bedienkommando geändert werden kann. Beide Betriebsarten laufen im
+Zustand \texttt{ST\_CONTROL}.
+
+Durch die in Abschnitt \ref{sec:kraft_position} gewählte Lösung ist diese Umschaltung
+strukturell trivial. Da die Kraftvorgabe keinen eigenen Regelkreis besitzt, sondern
+lediglich den Sollwert des Positionsreglers auf andere Weise berechnet, wird beim
+Umschalten kein Regler getauscht. Es ändert sich ausschließlich die Herkunft von
+$x_{soll}$: im Positionsbetrieb ein direkt vorgegebener Wert, im Kraftbetrieb das Ergebnis
+von Gleichung \ref{eq:kraft_vorsteuerung}.
+
+Damit entfallen sämtliche Probleme, die bei der Umschaltung zwischen zwei getrennten
+Reglern zu behandeln wären: Es gibt keine Zustandsgrößen zu übergeben, keinen
+stoßfreien Übergang zu konstruieren und keinen Sprung der Stellgröße im Umschaltmoment.
+Die ursprünglich mit \texttt{SG\_RESULT} geplante Lösung hätte diesen Aufwand erfordert,
+da dort ein zweiter Regler mit eigener Rückführung und eigener Fehlerbildung aktiv gewesen
+wäre. Der Wegfall des zweiten Regelkreises ist an dieser Stelle kein Verlust, sondern eine
+Vereinfachung.
+
+\subsection*{Halten der Greifkraft}
+
+Nach Erreichen der Zielposition geht die Ablaufsteuerung in den Zustand
+\texttt{ST\_HOLD} über. Der Antrieb steht, muss aber weiterhin ein Moment aufbringen, da
+die gespannte Feder ihn zurückzudrücken versucht.
+
+Motortreiber reduzieren den Spulenstrom im Stillstand üblicherweise auf einen niedrigeren
+Haltestrom, um die thermische Belastung zu senken. Der TMC2209 schaltet dazu nach Ablauf
+der Zeit \texttt{TPOWERDOWN} von \texttt{IRUN} auf \texttt{IHOLD} um. Bei der hier
+vorliegenden Anwendung führt dieses Verhalten jedoch dazu, dass das verbleibende
+Haltemoment die anliegende Federkraft nicht mehr sicher aufnimmt. Die Folge wäre ein
+Zurückdrücken des Antriebs und damit ein Einbruch der Greifkraft.
+
+Aus diesem Grund wurde \texttt{IHOLD} dauerhaft auf denselben Wert wie \texttt{IRUN}
+gesetzt. Gegenüber der ursprünglich vorgesehenen Umschaltung zur Laufzeit ist diese
+Lösung einfacher und vermeidet einen weiteren Nebeneffekt: Die Kennlinie von
+\texttt{SG\_RESULT} ist stromabhängig, sodass ein Wechsel des Stroms während des Betriebs
+die Messwerte auf unterschiedliche Kennlinien legen würde. Erkauft wird dies mit einer
+höheren Dauerverlustleistung im Stillstand, die bei den vorliegenden Strömen unkritisch
+ist.
+
+\subsection*{Fehlerverhalten}
+
+Aus jedem Zustand führt eine Fehlerbedingung nach \texttt{ST\_FAULT}. Dort wird der Motor
+angehalten, und weder Positions- noch Kraftvorgabe greifen weiterhin auf die
+Motoransteuerung zu. Der Zustand kann nicht über ein reguläres Bedienkommando verlassen
+werden; für eine erneute Inbetriebnahme ist ein bewusster Neustart erforderlich, nach dem
+Referenzfahrt und Richtungserkennung erneut durchlaufen werden. Die einzelnen
+Fehlerbedingungen und ihre Erkennung sind in Abschnitt \ref{sec:ueberlastschutz}
+beschrieben.
