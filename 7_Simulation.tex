@@ -102,10 +102,12 @@ entspricht dem in Abbildung \ref{fig:positionsregelkreis} gezeigten Regelkreis; 
 % ---------------------------------------------------------------
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{Abbildung/placeholder.png}
-    \caption{Simulink-Modell des Positionsregelkreises. Die obere Reihe bildet Regler und
-             Aktor ab, der untere Zweig das Messglied. Der Zweig rechts unten berechnet
-             die Kraft aus der Position und ist nicht Teil des Regelkreises
+    \includegraphics[width=\textwidth, trim=12pt 205pt 13pt 200pt, clip]
+                    {Abbildung/Positions_Effort_Regelkreis.pdf}
+    \caption{Simulink-Modell des Positionsregelkreises. Die obere Reihe bildet Regler,
+             Stellgrößengrenzen sowie Aktor und Strecke ab, der linke untere Zweig das
+             Messglied. Der rechte untere Zweig \texttt{Federkennlinie} berechnet die
+             Kraft aus der Position und ist nicht Teil des Regelkreises
              (Abschnitt \ref{sec:sim_feder}).}
     \label{fig:simulink_position}
 \end{figure}
@@ -388,7 +390,8 @@ der Encoder daraus macht. Ein Abgriff hinter dem Messglied würde die Quantisier
 Encoders und dessen Totzeit fälschlich in die Kraft einrechnen.
 
 Dass dieser Zweig strukturell kein Teil des Regelkreises ist, lässt sich am Modell in
-Abbildung \ref{fig:simulink_position} unmittelbar ablesen: Von seinem Ausgang führt kein
+Abbildung \ref{fig:simulink_position} unmittelbar ablesen: Er ist an denselben
+Positionsausgang angeschlossen wie das Messglied, von seinem Ausgang führt jedoch kein
 Signalweg zurück in den Kreis. Er bildet ausschließlich ab, welche Kraft sich aus der
 ohnehin geregelten Position ergibt.
 
